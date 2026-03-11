@@ -141,6 +141,7 @@ class Agent:
         session_id: Optional[str] = None,
         record_memory: bool = True,
         record_trace: bool = True,
+        priority: Optional[str] = None,
     ) -> Union[str, Generator[str, None, None]]:
         """Execute a task."""
         from orionagent.tracing import tracer
@@ -153,6 +154,10 @@ class Agent:
         session = self._session_manager.load(self.user_id, self.name, sid)
         if not session:
             session = Session(self.user_id, self.name, sid)
+
+        # Update session priority if provided
+        if priority:
+            session.priority = priority
 
         prompt = task
         if self.memory_config.mode != "none":
@@ -232,10 +237,10 @@ class Agent:
             
         return res
 
-    def chat(self, greeting: str = None, session_id: Optional[str] = None):
+    def chat(self, greeting: str = None, session_id: Optional[str] = None, priority: Optional[str] = None):
         """Starts an interactive chat session with this agent."""
         from orionagent.chat import chat
-        return chat(self, greeting=greeting, session_id=session_id)
+        return chat(self, greeting=greeting, session_id=session_id, priority=priority)
 
     # ------------------------------------------------------------------
     # Tool access

@@ -21,6 +21,9 @@ class MemoryConfig:
     importance_threshold: int = 7
     vector_top_k: int = 5
     storage_path: str = "memory"
+    extract_entities: bool = True
+    min_priority: str = "normal"
+    entity_categories: list = field(default_factory=lambda: ["Personal", "Preference", "Decision", "Professional"])
 
     def __post_init__(self):
         # Simplify mode names: long_term is a friendlier alias for persistent
@@ -37,5 +40,8 @@ class MemoryConfig:
             summary_tokens=data.get("summary_tokens", 120),
             importance_threshold=data.get("importance_threshold", 7),
             vector_top_k=data.get("vector_top_k", 5),
-            storage_path=data.get("storage_path", "memory")
+            storage_path=data.get("storage_path", "memory"),
+            extract_entities=data.get("extract_entities", True),
+            min_priority=data.get("min_priority", "normal"),
+            entity_categories=data.get("entity_categories", ["Personal", "Preference", "Decision", "Professional"])
         )

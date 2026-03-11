@@ -15,6 +15,8 @@ class Session:
         self.messages: List[Dict[str, str]] = []
         self.chunk_summaries: List[str] = []
         self.session_summary: str = ""
+        self.entities: Dict[str, Dict[str, Any]] = {} # name -> {value, category, importance}
+        self.priority: str = "normal"
         self.created_at = time.time()
         self.updated_at = time.time()
 
@@ -26,6 +28,8 @@ class Session:
             "messages": self.messages,
             "chunk_summaries": self.chunk_summaries,
             "session_summary": self.session_summary,
+            "entities": self.entities,
+            "priority": self.priority,
             "created_at": self.created_at,
             "updated_at": self.updated_at
         }
@@ -40,6 +44,8 @@ class Session:
         session.messages = data.get("messages", [])
         session.chunk_summaries = data.get("chunk_summaries", [])
         session.session_summary = data.get("session_summary", "")
+        session.entities = data.get("entities", {})
+        session.priority = data.get("priority", "normal")
         session.created_at = data.get("created_at", time.time())
         session.updated_at = data.get("updated_at", time.time())
         return session

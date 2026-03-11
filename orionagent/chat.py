@@ -21,12 +21,15 @@ def chat(
     target: Union["Agent", "Manager"],
     greeting: str = None,
     session_id: Optional[str] = None,
+    priority: Optional[str] = None,
 ) -> None:
     """Start an interactive chat loop with an Agent or Manager.
 
     Args:
         target:   An Agent or Manager instance. Both support `.ask(task, stream=True)`.
         greeting: Optional greeting to display at startup.
+        session_id: Optional session ID.
+        priority: Optional session priority ('low', 'normal', 'high').
     """
     name = getattr(target, "name", "OrionAI")
 
@@ -49,7 +52,7 @@ def chat(
                 break
 
             print(f"\n{name}:", end=" ")
-            for chunk in target.ask(task, stream=True, session_id=session_id):
+            for chunk in target.ask(task, stream=True, session_id=session_id, priority=priority):
                 print(chunk, end="", flush=True)
             print("\n")
 
