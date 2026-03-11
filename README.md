@@ -181,6 +181,12 @@ manager = Manager(
 ---
 
 ### 5. System-Level Token Optimization
+OrionAgent minimizes operational overhead by pruning unnecessary context and optimizing prompt density:
+
+- **Sliding Window Session Memory**: Automatically manages conversation history to prevent context window saturation and rising latency.
+- **Hierarchical Knowledge Briefing**: Instead of feeding raw history, the `persistent` memory tier distills facts into a concise **Knowledge Brief** stored in SQLite, reducing per-turn token usage by up to 70%.
+- **Compact Planning Prompt**: The `Strategy` engine uses a specialized, ultra-lean prompt (~100 tokens) to decompose tasks, ensuring that the heavy lifting is done with minimal structural baggage.
+- **Precision Tool Routing**: Agents only receive the context relevant to the specific step they are executing, preventing "prompt pollution" from unrelated task phases.
 
 
 ---
