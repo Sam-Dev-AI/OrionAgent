@@ -79,17 +79,34 @@ The `Manager` coordinates specialized agents through recursive strategy loops.
 ```python
 from orionagent import Agent, Manager, Gemini
 
+# 1. Define Model
+llm = Gemini("gemini-2.0-flash")
+
+# 2. Define Specialized Agents
+researcher = Agent(
+    name="Researcher",
+    role="Technical Scraper",
+    system_instruction="Focus on deep technical data sets.",
+    use_default_tools=True
+)
+
+writer = Agent(
+    name="Writer",
+    role="Content Strategist",
+    system_instruction="Synthesize complex data into premium reports.",
+    guards=["straight", "long"]
+)
+
+# 3. Link via Manager
 manager = Manager(
-    model=Gemini("gemini-2.0-flash"),
-    agents=[
-        Agent(name="Researcher", role="Technical Scraper", use_default_tools=True),
-        Agent(name="Writer", role="Content Strategist", guards=["straight", "long"])
-    ],
+    model=llm,
+    agents=[researcher, writer],
     strategy=["planning", "self_learn"] # Plan -> Execute -> Evaluate -> Correct
 )
 
 manager.chat("Draft a technical report on 2024 industrial AI trends.")
 ```
+
 
 ---
 
