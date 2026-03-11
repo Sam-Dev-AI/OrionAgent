@@ -53,31 +53,52 @@ def logic_guard(
             # LogicGuards strictly apply to full string outputs to ensure reliability.
             is_generator = isinstance(response, (Generator, type((i for i in []))))
             if output_validator and not is_generator:
-                if not output_validator(response):
+                from orionagent.tracing import tracer
+                # Try to find the agent instance to check for debug flag
+                agent_instance = getattr(func, "__self__", None)
+                if not agent_instance and args and hasattr(args[0], 'debug'):
+                    agent_instance = args[0]
+                    
+                is_verbose = getattr(agent_instance, "verbose", False)
+                is_debug = getattr(agent_instance, "debug", False)
+                tracer.log_event("guard", f"Applying output guard", task, verbose=is_verbose, debug=is_debug)
+                
+                validation_result = output_validator(response)
+                
+                if isinstance(validation_result, str) or not validation_result:
+                    # Determine the specific error message for retry/failure
+                    current_error_message = validation_result if isinstance(validation_result, str) else error_message
+
                     if auto_retry:
+                        # Get specific error message if validator is advanced
+                        # We'll check if the validator failed with a specific reason
+                        # For simple bool validators, we use the default error_message
+                        
                         # Attempt self-correction
-                        retry_task = f"{task}\n\n[GUARD FAILURE] {error_message}\nPlease correct your previous response."
+                        retry_task = f"{task}\n\n[GUARD FAILURE] {current_error_message}\nPlease correct your previous response."
                         
-                        # We try to reconstruct the call with the new task
+                        # Reconstruct new arguments carefully
+                        new_args = list(args)
                         new_kwargs = kwargs.copy()
-                        new_kwargs["task"] = retry_task
-                        new_kwargs["use_strategy"] = False
                         
-                        # If args were used, we might need to replace task in args
-                        # For simplicity, we use kwargs for retry if task was named, 
-                        # otherwise we try to call func with retry_task as first arg if args existed.
-                        if len(args) > 0:
-                             new_args = list(args)
-                             new_args[0] = retry_task
-                             response = func(*new_args, **new_kwargs)
+                        if "task" in kwargs:
+                            new_kwargs["task"] = retry_task
+                        elif len(args) > 0:
+                            # If wrapped as bound method on Agent, args[0] is task
+                            new_args[0] = retry_task
                         else:
-                             response = func(**new_kwargs)
+                            new_kwargs["task"] = retry_task
+                            
+                        response = func(*new_args, **new_kwargs)
                         
                         # Final check after retry
-                        if not output_validator(response):
-                            raise LogicGuardError(f"LogicGuard failed after retry: {error_message}")
+                        final_validation_result = output_validator(response)
+                        if isinstance(final_validation_result, str):
+                            raise LogicGuardError(f"LogicGuard failed after retry: {final_validation_result}")
+                        elif not final_validation_result:
+                            raise LogicGuardError(f"LogicGuard failed after retry: {current_error_message}")
                     else:
-                        raise LogicGuardError(f"LogicGuard failed: {error_message}")
+                        raise LogicGuardError(f"LogicGuard failed: {current_error_message}")
 
             return response
         return wrapper
@@ -117,17 +138,29 @@ def is_happy(text: str) -> bool:
     happy_words = ["happy", "great", "excellent", "amazing", "glad", "wonderful", "delighted", "awesome"]
     return any(w in lowered for w in happy_words)
 
-def is_straight(text: str) -> bool:
-    """Validator: Check for direct, no-fluff, no-emoji response."""
+def is_straight(text: str) -> Union[bool, str]:
+    """Validator: Check for direct, no-fluff, no-emoji response.
+    Returns True if valid, or a string with the reason for failure.
+    """
     import re
     # Strictly no emojis
     emoji_pattern = re.compile(r"[\U00010000-\U0010ffff]", flags=re.UNICODE)
-    if emoji_pattern.search(text):
-        return False
+    found_emoji = emoji_pattern.search(text)
+    if found_emoji:
+        return f"Found emoji: '{found_emoji.group(0)}'. Output must have NO emojis."
+        
     # No common LLM fluff/filler
-    fluff = ["i hope this helps", "let me know if", "as an ai language model", "is there anything else"]
+    fluff = [
+        "i hope this helps", "let me know if", "as an ai language model", 
+        "is there anything else", "happy to assist", "would you like me to",
+        "feel free to", "glad to help"
+    ]
     lowered = text.lower()
-    return not any(f in lowered for f in fluff)
+    for f in fluff:
+        if f in lowered:
+            return f"Found conversational fluff: '{f}'. Output must be direct with no filler."
+            
+    return True
 
 def contains_keywords(keywords: list):
     """Validator Factory: Check if text contains specific keywords."""

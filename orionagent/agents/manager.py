@@ -59,6 +59,7 @@ class Manager:
 
     def __init__(
         self,
+        name: str = "Manager",
         model: Optional[ModelProvider] = None,
         strategy: Optional[Union[str, List[str]]] = None,
         system_instruction: Optional[str] = None,
@@ -69,13 +70,19 @@ class Manager:
         temperature: Optional[float] = None,
         tools: Optional[List[Any]] = None,
         verbose: bool = False,
+        async_mode: bool = True,
+        debug: bool = False,
     ):
+        self.name = name
         self._agents: List[Agent] = []
         self._model = model
         self.system_instruction = system_instruction or "You are Orion, a highly efficient AI orchestrator. Route tasks to the best agents and ensure high-quality results."
         self.user_id = user_id
         self.temperature = temperature
-        self.verbose = verbose
+        # Inherit verbose and debug from model if not explicitly set
+        self.verbose = verbose or (getattr(self._model, "verbose", False) if self._model else False)
+        self.debug = debug or (getattr(self._model, "debug", False) if self._model else False)
+        self.async_mode = async_mode
         
         # --- Memory setup (Same as Agent) ---
         from orionagent.memory.config import MemoryConfig
@@ -135,12 +142,12 @@ class Manager:
         """
         if self._model and agent.model is None:
             agent.model = self._model
-        # We don't overwrite agent.memory because it's a proxy.
-        # Instead, we should probably let agents have their own local session memory
-        # but shared persistent memory if desired? 
-        # For now, let's just make sure we don't break the agent's proxy.
+        
         if self.verbose:
             agent.verbose = True
+        if self.debug:
+            agent.debug = True
+            
         self._agents.append(agent)
         return self
 
@@ -152,16 +159,22 @@ class Manager:
         self,
         task: str,
         stream: bool = True,
+        session_id: Optional[str] = None,
+        record_memory: bool = True,
+        record_trace: bool = True,
     ) -> Union[str, Generator[str, None, None]]:
-        """Route *task* through the configured strategy."""
+        """Orchestrate a task across multiple agents."""
         from orionagent.tracing import tracer
         from orionagent.agents.handoff import AgentHandoff
         
-        trace_id = tracer.start_trace("manager_ask", "Manager", task)
+        trace_id = None
+        if record_trace:
+            trace_id = tracer.start_trace("manager_ask", self.name, task, verbose=self.verbose, debug=self.debug)
 
         if not self._agents:
             error = "Error: No agents added to the manager."
-            tracer.end_trace(trace_id, error)
+            if record_trace:
+                tracer.end_trace(trace_id, error)
             return (x for x in [error]) if stream else error
 
         context = None
@@ -194,6 +207,10 @@ class Manager:
             temperature=self.temperature,
             tools=self.tools,
             stream=stream,
+            async_mode=self.async_mode,
+            verbose=self.verbose,
+            debug=self.debug,
+            record_trace=False,
         )
         
         # Handle Handoff objects (Direct Return)
@@ -201,12 +218,14 @@ class Manager:
             tracer.log_event("handoff_detected", result.target_agent, result.task, metadata={"source": result.source_agent})
             target = next((a for a in self._agents if a.name == result.target_agent), None)
             if target:
-                final_res = target.ask(result.to_prompt(), stream=stream)
-                tracer.end_trace(trace_id, "[Handoff Executed]")
+                final_res = target.ask(result.to_prompt(), stream=stream, record_trace=False)
+                if trace_id:
+                    tracer.end_trace(trace_id, "[Handoff Executed]")
                 return final_res
             else:
                 err = f"Error: Handoff target agent '{result.target_agent}' not found."
-                tracer.end_trace(trace_id, err)
+                if trace_id:
+                    tracer.end_trace(trace_id, err)
                 return (x for x in [err]) if stream else err
 
         if stream:
@@ -218,15 +237,17 @@ class Manager:
                 res_str = "".join(full_response)
                 if self.memory_config.mode != "none":
                     self._memory_pipeline.process_turn(session, "assistant", res_str, self._model)
-                tracer.end_trace(trace_id, res_str)
-                if self.verbose:
+                if trace_id:
+                    tracer.end_trace(trace_id, res_str)
+                if self.verbose and record_trace:
                     tracer.print_summary()
             return _stream_and_log()
         else:
             if self.memory_config.mode != "none":
                 self._memory_pipeline.process_turn(session, "assistant", result, self._model)
-            tracer.end_trace(trace_id, result)
-            if self.verbose:
+            if trace_id:
+                tracer.end_trace(trace_id, result)
+            if self.verbose and record_trace:
                 tracer.print_summary()
             return result
     def chat(self, greeting: str = None, session_id: Optional[str] = None):

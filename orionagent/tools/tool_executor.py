@@ -33,10 +33,12 @@ class ToolExecutor:
         cache_size: int = _DEFAULT_CACHE_SIZE,
         timeout: int = _DEFAULT_TIMEOUT,
         max_result_length: int = _MAX_RESULT_LENGTH,
+        async_mode: bool = True,
     ):
         self.timeout = timeout
         self.max_result_length = max_result_length
         self._cache_size = cache_size
+        self.async_mode = async_mode
         self._cache: OrderedDict = OrderedDict()  # (name, args_key) -> result
 
     # ------------------------------------------------------------------
@@ -90,6 +92,18 @@ class ToolExecutor:
         tools = tools or []
         tool_map = {t.name: t for t in tools}
         results = []
+
+        if not self.async_mode:
+            for call in tool_calls:
+                name = call.get("name")
+                args = call.get("args")
+                target = tool_map.get(name)
+                if target:
+                    res = self._run_with_cache(target, args)
+                    results.append({"name": name, "result": res})
+                else:
+                    results.append({"name": name, "result": f"Error: Tool '{name}' not found."})
+            return results
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_to_call = {}

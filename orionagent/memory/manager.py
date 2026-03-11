@@ -16,6 +16,12 @@ class MemoryPipeline:
         if self.config.mode == "none":
             return
             
+        from orionagent.tracing import tracer
+        # If the LLM has verbose or debug enabled, we log
+        is_verbose = getattr(llm, "verbose", False)
+        is_debug = getattr(llm, "debug", False)
+        tracer.log_event("memory", f"Storing {role} turn", content[:50], verbose=is_verbose, debug=is_debug)
+
         session.messages.append({"role": role, "content": content})
         self.session_manager.save(session)
         
@@ -76,6 +82,11 @@ class MemoryPipeline:
         if self.config.mode == "none":
             return ""
             
+        from orionagent.tracing import tracer
+        # We don't easily have 'verbose' here without passing it, 
+        # but build_context is usually called inside Agent.ask where trace is active.
+        # For now, let's keep it quiet unless we add 'verbose' to build_context.
+        
         context_parts = []
         
         # 1. Retrieve from Long-Term Memory

@@ -36,9 +36,12 @@ class Model:
         model: str = None,
         api_key: str = None,
         base_url: str = None,
+        streaming: bool = True,
+        verbose: bool = False,
+        debug: bool = False,
     ) -> ModelProvider:
         # Build kwargs, only passing values that were explicitly provided
-        kwargs = {}
+        kwargs = {"streaming": streaming, "verbose": verbose, "debug": debug}
         if model is not None:
             kwargs["model_name"] = model
         if api_key is not None:

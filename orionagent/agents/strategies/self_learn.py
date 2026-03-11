@@ -61,16 +61,20 @@ class SelfLearnStrategy(BaseStrategy):
         temperature: Optional[float] = None,
         tools: Optional[List[Any]] = None,
         stream: bool = True,
+        async_mode: bool = True,
+        verbose: bool = False,
+        debug: bool = False,
+        record_trace: bool = True,
     ) -> Union[str, Generator[str, None, None]]:
         # Fast bypass for simple conversational tasks
         if not self.is_complex_task(task):
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace)
 
         if not model:
             # No model for eval -- fall back to single delegation
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace)
 
         # Check if we have a learned best agent for this task type
         learned_agent = self._get_learned_agent(task, agents)
@@ -111,7 +115,7 @@ class SelfLearnStrategy(BaseStrategy):
         for attempt in range(self.max_refinements + 1):
             tried.add(selected.name)
             
-            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False)
+            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False)
             
             score, feedback = self._evaluate(original_task, response, model, system_instruction, context)
 
@@ -165,7 +169,7 @@ class SelfLearnStrategy(BaseStrategy):
 
         for attempt in range(self.max_refinements + 1):
             # Must collect full response for evaluation
-            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False)
+            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False)
 
             score, feedback = self._evaluate(original_task, response, model, system_instruction, context)
 

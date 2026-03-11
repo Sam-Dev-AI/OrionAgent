@@ -52,20 +52,26 @@ class Agent:
         max_refinements: int = 2,
         guards: Optional[List[Union[str, Callable]]] = None,
         verbose: bool = False,
+        async_mode: bool = True,
+        debug: bool = False,
     ):
         self.name = name
         self.role = role
         self.description = description
         self.system_instruction = system_instruction
+        self.async_mode = async_mode
+        self.debug = debug
         
         if isinstance(model, str):
             from orionagent.models.model import Model
-            self.model = Model(provider=model)
+            self.model = Model(provider=model, debug=self.debug)
         else:
             self.model = model
             
         self.user_id = user_id
-        self.verbose = verbose
+        # Inherit verbose and debug from model if not explicitly set
+        self.verbose = verbose or (getattr(self.model, "verbose", False) if self.model else False)
+        self.debug = debug or (getattr(self.model, "debug", False) if self.model else False)
 
         # --- Memory setup ---
         if isinstance(memory, MemoryConfig):
@@ -94,7 +100,7 @@ class Agent:
         if use_default_tools:
             self._merge_default_tools()
 
-        self.tool_executor = ToolExecutor()
+        self.tool_executor = ToolExecutor(async_mode=self.async_mode)
 
         # --- Strategy ---
         from orionagent.agents.strategies import get_strategy
@@ -134,10 +140,13 @@ class Agent:
         use_strategy: bool = True,
         session_id: Optional[str] = None,
         record_memory: bool = True,
+        record_trace: bool = True,
     ) -> Union[str, Generator[str, None, None]]:
         """Execute a task."""
         from orionagent.tracing import tracer
-        trace_id = tracer.start_trace("agent_ask", self.name, task)
+        trace_id = None
+        if record_trace:
+            trace_id = tracer.start_trace("agent_ask", self.name, task, verbose=self.verbose, debug=self.debug)
 
         # Session loading
         sid = session_id or self._session_manager.auto(self.user_id, self.name)
@@ -161,13 +170,18 @@ class Agent:
                 system_instruction=self.system_instruction,
                 temperature=None,
                 tools=self.tools,
-                stream=stream
+                stream=stream,
+                async_mode=self.async_mode,
+                verbose=self.verbose,
+                debug=self.debug,
+                record_trace=False # Strategy internally calls agents, so we don't want deep traces
             )
             # Log the intent (result) if not streaming. If streaming, the strategy handles generator.
             if not stream:
                 if self.memory_config.mode != "none" and record_memory:
                     self._memory_pipeline.process_turn(session, "assistant", res, self.model)
-                tracer.end_trace(trace_id, res)
+                if trace_id:
+                    tracer.end_trace(trace_id, res)
             
             # Since strategies yield directly if stream=True, we must wrap it to log
             if stream:
@@ -177,12 +191,18 @@ class Agent:
                         full_res.append(chunk)
                         yield chunk
                     res_str = "".join(full_res)
-                    if self.memory_config.mode != "none" and record_memory:
-                        self._memory_pipeline.process_turn(session, "assistant", res_str, self.model)
-                    tracer.end_trace(trace_id, res_str)
-                    if self.verbose: tracer.print_summary()
+                    if trace_id:
+                        tracer.end_trace(trace_id, res_str)
+                    if self.verbose and record_trace: 
+                        tracer.print_summary()
                 return _trace_generator_strategy()
                 
+            if not stream:
+                if self.memory_config.mode != "none" and record_memory:
+                    self._memory_pipeline.process_turn(session, "assistant", res, self.model)
+                if trace_id:
+                    tracer.end_trace(trace_id, res)
+            
             return res
 
         if stream:
@@ -195,17 +215,19 @@ class Agent:
                 res_str = "".join(full_res)
                 if self.memory_config.mode != "none" and record_memory:
                     self._memory_pipeline.process_turn(session, "assistant", res_str, self.model)
-                tracer.end_trace(trace_id, res_str)
-                if self.verbose:
+                if trace_id:
+                    tracer.end_trace(trace_id, res_str)
+                if self.verbose and record_trace:
                     tracer.print_summary()
             return _trace_generator()
 
         res = self._ask_full(prompt, session)
         if self.memory_config.mode != "none" and record_memory:
             self._memory_pipeline.process_turn(session, "assistant", res, self.model)
-        tracer.end_trace(trace_id, res)
+        if trace_id:
+            tracer.end_trace(trace_id, res)
         
-        if self.verbose:
+        if self.verbose and record_trace:
             tracer.print_summary()
             
         return res
@@ -222,7 +244,7 @@ class Agent:
     def use_tool(self, tool_name: str, input_data) -> str:
         """Run a tool via the centralised ToolExecutor."""
         from orionagent.tracing import tracer
-        trace_id = tracer.start_trace("tool_call_agent", tool_name, input_data)
+        trace_id = tracer.start_trace("tool_call_agent", tool_name, input_data, verbose=self.verbose, debug=self.debug)
         res = self.tool_executor.execute(tool_name, input_data, self.tools)
         tracer.end_trace(trace_id, res)
         return res

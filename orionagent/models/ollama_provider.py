@@ -19,8 +19,11 @@ class Ollama(ModelProvider):
         model_name: str = "llama3.2",
         base_url: str = "http://localhost:11434",
         token_count: bool = False,
+        streaming: bool = True,
+        verbose: bool = False,
+        debug: bool = False,
     ):
-        super().__init__(token_count=token_count)
+        super().__init__(token_count=token_count, streaming=streaming, verbose=verbose, debug=debug)
         self.model_name = model_name
         self.base_url = base_url.rstrip("/")
         
@@ -103,8 +106,10 @@ class Ollama(ModelProvider):
                             func_call = tc["function"]
                             target = next((t for t in tools if t.name == func_call["name"]), None)
                             if target:
+                                from orionagent.tracing import tracer
+                                args_str = json.dumps(func_call["arguments"]) if isinstance(func_call["arguments"], dict) else str(func_call["arguments"])
+                                tracer.log_event("tool", f"Executing {func_call['name']}", args_str, verbose=self.verbose, debug=self.debug)
                                 try:
-                                    args_str = json.dumps(func_call["arguments"]) if isinstance(func_call["arguments"], dict) else str(func_call["arguments"])
                                     res = target.run(args_str)
                                 except Exception as e:
                                     res = f"Error: {e}"
@@ -187,8 +192,10 @@ class Ollama(ModelProvider):
                         func_call = tc["function"]
                         target = next((t for t in tools if t.name == func_call["name"]), None)
                         if target:
+                            from orionagent.tracing import tracer
+                            args_str = json.dumps(func_call["arguments"]) if isinstance(func_call["arguments"], dict) else str(func_call["arguments"])
+                            tracer.log_event("tool", f"Executing {func_call['name']}", args_str, verbose=self.verbose, debug=self.debug)
                             try:
-                                args_str = json.dumps(func_call["arguments"]) if isinstance(func_call["arguments"], dict) else str(func_call["arguments"])
                                 res = target.run(args_str)
                             except Exception as e:
                                 res = f"Error: {e}"

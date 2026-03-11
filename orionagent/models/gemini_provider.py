@@ -20,8 +20,11 @@ class Gemini(ModelProvider):
         api_key: Optional[str] = None,
         model_name: str = "gemini-2.0-flash",
         token_count: bool = False,
+        streaming: bool = True,
+        verbose: bool = False,
+        debug: bool = False,
     ):
-        super().__init__(token_count=token_count)
+        super().__init__(token_count=token_count, streaming=streaming, verbose=verbose, debug=debug)
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         self.model_name = model_name
         
@@ -124,6 +127,10 @@ class Gemini(ModelProvider):
                     args_str = json.dumps(fc.args) if isinstance(fc.args, dict) else str(fc.args)
                     calls.append({"name": fc.name, "args": args_str})
                 
+                from orionagent.tracing import tracer
+                for c in calls:
+                    tracer.log_event("tool", f"Executing {c['name']}", c['args'], verbose=self.verbose, debug=self.debug)
+                
                 results = executor.execute_many(calls, tools)
                 
                 tool_results = []
@@ -183,16 +190,19 @@ class Gemini(ModelProvider):
                     messages = [{"role": "user", "parts": [{"text": messages}]}]
                 
                 messages.append(full_response.candidates[0].content)
-                
-                # Parallel tool execution
-                from orionagent.tools.tool_executor import ToolExecutor
-                executor = ToolExecutor()
-                
+
+                # Parallel tool execution preparation
                 calls = []
                 for fc in full_response.function_calls:
                     args_str = json.dumps(fc.args) if isinstance(fc.args, dict) else str(fc.args)
                     calls.append({"name": fc.name, "args": args_str})
+
+                from orionagent.tracing import tracer
+                for c in calls:
+                    tracer.log_event("tool", f"Executing {c['name']}", c['args'], verbose=self.verbose, debug=self.debug)
                 
+                from orionagent.tools.tool_executor import ToolExecutor
+                executor = ToolExecutor()
                 results = executor.execute_many(calls, tools)
                 
                 tool_results = []

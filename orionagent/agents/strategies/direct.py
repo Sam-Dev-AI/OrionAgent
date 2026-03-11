@@ -25,6 +25,10 @@ class DirectStrategy(BaseStrategy):
         temperature: Optional[float] = None,
         tools: Optional[List[Any]] = None,
         stream: bool = True,
+        async_mode: bool = True,
+        verbose: bool = False,
+        debug: bool = False,
+        record_trace: bool = True,
     ) -> Union[str, Generator[str, None, None], Any]:
 
         prompt = f"{context}\n\n==== CURRENT TASK ====\n{task}" if context else task
@@ -52,9 +56,9 @@ class DirectStrategy(BaseStrategy):
                 selected = agents[0]
 
         if stream:
-            return self._stream_response(selected, prompt, model)
+            return self._stream_response(selected, prompt, model, record_trace=record_trace)
         
-        result = selected.ask(prompt, stream=False, use_strategy=False, record_memory=False)
+        result = selected.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=record_trace)
         return result
 
     @staticmethod
@@ -69,6 +73,6 @@ class DirectStrategy(BaseStrategy):
         )
 
     def _stream_response(
-        self, agent: Agent, task: str, model: Any = None
+        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True
     ) -> Generator[str, None, None]:
-        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False)
+        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace)

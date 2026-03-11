@@ -18,8 +18,11 @@ class OpenAI(ModelProvider):
         api_key: Optional[str] = None,
         model_name: str = "gpt-4o-mini",
         token_count: bool = False,
+        streaming: bool = True,
+        verbose: bool = False,
+        debug: bool = False,
     ):
-        super().__init__(token_count=token_count)
+        super().__init__(token_count=token_count, streaming=streaming, verbose=verbose, debug=debug)
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self.model_name = model_name
 
@@ -95,6 +98,8 @@ class OpenAI(ModelProvider):
                 for tc in choice.message.tool_calls:
                     target = next((t for t in tools if t.name == tc.function.name), None)
                     if target:
+                        from orionagent.tracing import tracer
+                        tracer.log_event("tool", f"Executing {tc.function.name}", tc.function.arguments, verbose=self.verbose, debug=self.debug)
                         try:
                             # Pass raw JSON string directly to tool.run()
                             res = target.run(tc.function.arguments)
@@ -201,6 +206,10 @@ class OpenAI(ModelProvider):
                 for tc_data in tool_calls_list:
                     tc_id = tc_data["id"]
                     tc_func = tc_data["function"]
+                    
+                    from orionagent.tracing import tracer
+                    tracer.log_event("tool", f"Executing {tc_func['name']}", tc_func["arguments"], verbose=self.verbose, debug=self.debug)
+                    
                     target = next((t for t in tools if t.name == tc_func["name"]), None)
                     if target:
                         try:

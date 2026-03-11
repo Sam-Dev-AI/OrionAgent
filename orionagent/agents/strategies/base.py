@@ -17,6 +17,11 @@ class BaseStrategy:
     routes tasks to agents and assembles the final response.
     """
 
+    def _stream_response(
+        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True
+    ) -> Generator[str, None, None]:
+        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace)
+
     def execute(
         self,
         task: str,
@@ -27,6 +32,10 @@ class BaseStrategy:
         temperature: Optional[float] = None,
         tools: Optional[List[Any]] = None,
         stream: bool = True,
+        async_mode: bool = True,
+        verbose: bool = False,
+        debug: bool = False,
+        record_trace: bool = True,
     ) -> Union[str, Generator[str, None, None], "AgentHandoff"]:
         """Run the strategy on *task* using the given *agents*.
 
@@ -93,9 +102,9 @@ class BaseStrategy:
         
         # Check for sequencing or complexity indicators
         complex_keywords = [
-            " and ", " then ", " after ", " first ", " finally ", 
-            " research ", " compare ", " summary ", " outline ",
-            " plan ", " steps "
+            "and", "then", "after", "first", "finally", 
+            "research", "compare", "summary", "outline",
+            "plan", "steps"
         ]
         task_lower = task.lower()
         if any(kw in task_lower for kw in complex_keywords):

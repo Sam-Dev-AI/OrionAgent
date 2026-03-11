@@ -54,7 +54,8 @@ def main():
         # 'self_learn' -> Quality control. If an agent fails the 'verdict', Manager re-delegates.
         strategy=["planning", "self_learn"], 
         agents=[researcher, analyst],
-        verbose=True            # Enables beautiful orchestration traces
+        verbose=True,           # Post-session summary trace
+        debug=True              # Real-time 'Industrial' logs for the whole swarm
     )
 
     print("\n" + "="*50)

@@ -39,7 +39,7 @@ def calculate_roi(investment: float, revenue: float):
 def main():
     # 3. INITIALIZE THE CORE ENGINE
     # OrionAgent supports multiple providers (Gemini, OpenAI, Ollama).
-    llm = Gemini(model_name="gemini-2.0-flash", token_count=True)
+    llm = Gemini(model_name="gemini-2.5-flash", token_count=True, debug=True)
 
     # 4. DEFINE THE 'VANGUARD' AGENT
     # Precision-engineered to be ultra-efficient and direct.
@@ -52,7 +52,8 @@ def main():
         use_default_tools=True,    # Injects Web Search, Terminal, Python, and Files tools
         tools=[analyze_sentiment, get_crypto_price, calculate_roi],
         guards=["straight", "short"], # Logic Guards: No emojis, Max 3 sentences
-        verbose=True,              # Enables the sleek, dimmed execution trace
+        verbose=True,              # Post-session summary
+        debug=True,                # Real-time 'Industrial' logs: [PLAN], [TOOL], [GUARD], [MEMORY]
     )
 
     print("\n" + "="*50)

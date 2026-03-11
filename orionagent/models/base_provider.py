@@ -10,8 +10,11 @@ from orionagent.tools.base_tool import Tool
 class ModelProvider:
     """Abstract base for model providers."""
 
-    def __init__(self, token_count: bool = False):
+    def __init__(self, token_count: bool = False, streaming: bool = True, verbose: bool = False, debug: bool = False):
         self.token_count = token_count
+        self.streaming = streaming
+        self.verbose = verbose
+        self.debug = debug
 
 
     def generate(
@@ -33,6 +36,16 @@ class ModelProvider:
             max_tokens:         Maximum tokens in the response.
             tools:              List of Tool objects the model can invoke.
         """
+        # Tracing tool execution
+        from orionagent.tracing import tracer
+        # Note: The following lines assume 'tool_calls' and 'tool_executor' are defined
+        # within the generate method's implementation, which is not shown in the base class.
+        # This code is inserted as requested, but might require further context for a complete implementation.
+        # For a base class, this might be a placeholder for subclasses to implement.
+        # trace_id = tracer.start_trace("tool_execution", f"Executing {len(tool_calls)} tools", tool_calls, verbose=self.verbose)
+        
+        # results = tool_executor.execute_many(tool_calls, tools)
+        # tracer.end_trace(trace_id, results)
         raise NotImplementedError("Subclasses must implement generate().")
 
     def generate_stream(

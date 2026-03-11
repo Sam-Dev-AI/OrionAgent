@@ -134,14 +134,53 @@ The `Manager` employs recursive strategy loops to decompose and execute complex 
 - **`planning`**: Decomposes a high-level goal into a deterministic array of parallelizable tasks, creating a clear execution roadmap.
 - **`self_learn`**: The **Orion Verdict Loop**. If an agent produces an inadequate result or fails a guard, the Manager dynamically evaluates the failure and re-delegates with corrected context.
 
-### 4. High-Performance Execution Engine NEW
+### 4. High-Performance Execution Engine
 OrionAgent is engineered for extreme efficiency, significantly reducing the "abstraction tax" of traditional frameworks:
-- **Real-Time Streaming**: Enabled by default (`streaming=True`). All model providers support native chunk-level output for zero-latency UI responsiveness.
-- **Concurrent Execution**: Orchestration strategies and tool execution now run in parallel by default (`async_mode=True`), verified to **reduce execution time by up to 60%** for complex tasks.
-- **Built-in Observability**: Real-time, gray-highlighted debug logs (`verbose=True`) provide deep visibility into planning, tool usage, memory operations, and guard validations without cluttering production logs.
-- **System-Level Persistence**: Utilizes native provider-side instructions to bake personas into the model's base state, verified to **reduce token usage by 30%**.
-- **Autonomous Context Pruning**: Real-time monitoring of token counts, dynamically removing redundant history turns during long-running interactions.
-- **Handoff Protocols**: Direct agent-to-agent delegation via `trigger_handoff()` to minimize Manager overhead for low-level tasks.
+
+- **Real-Time Streaming (`streaming=True`)**: Enabled by default. All model providers support native chunk-level output for zero-latency UI responsiveness.
+- **Concurrent Execution (`async_mode=True`)**: Orchestration strategies and tool execution run in parallel by default. Verified to **reduce execution time by up to 60%** for complex tasks by utilizing modern Python concurrency.
+- **Industrial Debug Mode (`debug=True`)**: Enables real-time, terminal-optimized logs showing the agent's internal reasoning *as it happens*. Perfect for deep-web research and complex tool debugging.
+    - `[PLAN]` : Strategy selection and task decomposition.
+    - `[TOOL]` : Real-time tool execution and argument monitoring.
+    - `[GUARD]` : LogicGuard validation and self-correction cycles.
+    - `[MEMORY]` : Knowledge retrieval and persistent storage updates.
+- **Sleek Observability (`verbose=True`)**: Provides a unified, professional trace summary after execution, showing timing, pathing, and token usage in a compact format.
+
+---
+
+## Detailed Performance Usage
+
+### Professional Logging & Observability
+OrionAgent offers two tiers of visibility:
+1.  **`debug=True`**: Real-time "Industrial" logs (tags like `[TOOL]`, `[PLAN]`). Use this to watch agents think and work live.
+2.  **`verbose=True`**: Post-execution "Trace Summary". Use this for clean, professional reports of what happened and how long it took.
+
+```python
+# Enable 'Industrial' real-time logs + 'Trace' summary
+llm = Gemini(model_name="gemini-2.0-flash", debug=True, verbose=True)
+
+# Or enable per-component for granular control
+manager = Manager(model=llm, debug=True)
+agent = Agent(name="Sentry", debug=True)
+```
+
+### Concurrent Orchestration
+OrionAgent leverages parallel orchestration to maximize throughput. When `async_mode` is active, the Manager executes independent task groups simultaneously.
+
+```python
+# Explicitly control concurrency (Default: True)
+manager = Manager(
+    agents=[researcher, coder],
+    async_mode=True 
+)
+```
+
+- **Parallel Tooling**: If an agent needs to call 3 tools (e.g., searching 3 different sources), it will execute them in parallel, returning the results in the time of the single slowest call.
+- **Parallel Strategy**: The `planning` strategy automatically groups tasks that don't depend on each other for simultaneous execution.
+
+---
+
+### 5. System-Level Token Optimization
 
 
 ---
