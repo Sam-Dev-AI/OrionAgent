@@ -45,9 +45,9 @@ from orionagent.tools.handoff_tool import trigger_handoff
 from orionagent.chat import chat
 
 # Import specific providers
-from orionagent.models.openai_provider import OpenAIProvider
-from orionagent.models.gemini_provider import GeminiProvider
-from orionagent.models.ollama_provider import OllamaProvider
+from orionagent.models.openai_provider import OpenAI
+from orionagent.models.gemini_provider import Gemini
+from orionagent.models.ollama_provider import Ollama
 
 __all__ = [
     # Core APIs
@@ -69,9 +69,9 @@ __all__ = [
     # Model APIs
     "ModelProvider",
     "Model",
-    "OpenAIProvider",
-    "GeminiProvider",
-    "OllamaProvider",
+    "OpenAI",
+    "Gemini",
+    "Ollama",
     # Provider utilities
     "get_provider",
     "register_provider",

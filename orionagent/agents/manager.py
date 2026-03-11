@@ -3,9 +3,9 @@
 Usage:
 
     from orionagent import Agent, Manager
-    from orionagent.models import GeminiProvider
+    from orionagent.models import Gemini
 
-    llm = GeminiProvider(model_name="gemini-2.0-flash")
+    llm = Gemini(model_name="gemini-2.0-flash")
 
     # Agents defined INLINE inside Manager:
     manager = Manager(

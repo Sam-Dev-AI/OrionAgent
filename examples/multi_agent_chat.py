@@ -1,53 +1,62 @@
 """
-Multi Agent Chat -- Advanced Orchestration
+Multi-Agent Orchestration -- Autonomous Delegation & Self-Correction
 
-This script demonstrates a Manager coordinating multiple agents.
+This script demonstrates the 'Manager' pattern, where a central brain coordinates
+specialized agents using the 'self_learn' strategy.
+
+Key Features:
+- Autonomous Task Delegation: Manager routes tasks to the best agent.
+- Strategy-Based Planning: Multi-turn self-correction and evaluation.
+- Shared Context: Agents share session and persistent memory.
+- Token Efficiency: System instructions are shared across agent turns.
 """
 
 import os
-from orionagent import Agent, Manager, GeminiProvider
+from orionagent import Agent, Manager, Gemini
 
-# ADD YOUR API KEY HERE
+# 1. API KEY CONFIGURATION
 os.environ["GEMINI_API_KEY"] = "Your_API_Key"
 
 def main():
-    llm = GeminiProvider(model_name="gemini-2.5-flash", token_count=True)
+    # 2. INITIALIZE CENTRAL MODEL
+    llm = Gemini(model_name="gemini-2.0-flash", token_count=True)
 
-    # 1. Setup Agents
+    # 3. DEFINE SPECIALIZED AGENTS
     researcher = Agent(
         name="researcher",
-        role="Researcher",
-        description="I find facts and real-time data using web search and system tools.",
-        memory="session", # Automatically gets session memory
+        role="Technical Researcher",
+        description="Expert at finding deep technical facts using web search tools.",
+        memory="session",
         use_default_tools=True,
-        guards=["polite"],
         verbose=True
     )
 
     writer = Agent(
         name="writer",
-        role="Writer",
-        description="I write enthusiastic and detailed articles.",
-        memory={
-            "mode": "persistent",
-            "chunk_size": 10,
-            "vector_top_k": 3
-        }, # Advanced memory configuration
-        guards=["happy", "long"], # Must be cheerful and at least 5 sentences!
+        role="Creative Content Writer",
+        description="Transforms raw technical facts into engaging, detailed articles.",
+        memory="persistent", # Remembers previous writing styles/facts across runs
+        guards=["happy", "long"], # Enforces enthusiastic tone and detailed responses
         verbose=True
     )
 
-    # 2. Setup Manager with 'selflearn' strategy for autonomous correction
+    # 4. DEFINE THE MANAGER
+    # The Manager acts as the orchestrator for the multi-agent system.
     manager = Manager(
+        name="Orion-Manager",
         model=llm,
-        strategy="self_learn",  # MOST ADVANCED: Manager evaluates and re-delegates if needed
-        verbose=True,         # See the beautiful dimmed orchestration trace
-        agents=[researcher, writer]
+        strategy="self_learn",  # ADVANCED: Evaluates agent output and re-delegates if quality is low.
+        agents=[researcher, writer],
+        verbose=True            # Enables beautiful orchestration traces
     )
 
-    print("\n🚀 OrionAI Multi-Agent Advanced Chat")
-    print("-------------------------------------")
-    print("DEMOS: Planning Strategy + Auto-Handoff + Built-in Guards")
+    print("\n" + "="*50)
+    print("🚀 ORIONAGENT MULTI-AGENT ORCHESTRATION")
+    print("="*50)
+    print("DEMOS: Self-Learn Strategy + Agent Cooperation + Shared Memory")
+    print("USAGE: Ask a complex task that requires research and writing.\n")
+
+    # 5. START INTERACTIVE SESSION
     manager.chat("How can I help you coordinate your agents today?")
 
 if __name__ == "__main__":

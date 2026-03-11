@@ -11,7 +11,7 @@ from orionagent.models.base_provider import ModelProvider
 from orionagent.tools.base_tool import Tool
 
 
-class OllamaProvider(ModelProvider):
+class Ollama(ModelProvider):
     """LLM provider backed by a local Ollama server."""
 
     def __init__(

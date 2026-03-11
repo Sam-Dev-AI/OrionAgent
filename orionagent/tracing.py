@@ -40,6 +40,7 @@ class TraceManager:
             cls._instance = super(TraceManager, cls).__new__(cls)
             cls._instance.events = []
             cls._instance.active_traces = {}
+            cls._instance._last_printed_idx = 0
         return cls._instance
 
     def log_event(self, event_type: str, name: str, input_data: Any, 
@@ -86,23 +87,9 @@ class TraceManager:
             metadata=data["metadata"]
         )
 
-    def clear(self):
-        """Reset the event history."""
-        self.events = []
-        self.active_traces = {}
-
-    def export(self, filepath: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Export history to a list of dicts, or save to JSON file."""
-        data = [asdict(e) for e in self.events]
-        if filepath:
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
-        return data
-
     def print_summary(self):
-        """Print a human-readable summary of the last execution."""
-        if not self.events:
-            print("\n--- No trace data available ---")
+        """Print a human-readable summary of new events since the last print."""
+        if not self.events or self._last_printed_idx >= len(self.events):
             return
 
         # Dim/Grey color for trace logs
@@ -113,7 +100,7 @@ class TraceManager:
         print("🔍 ORIONAI EXECUTION TRACE")
         print(f"{'='*60}{RESET}")
         
-        for e in self.events:
+        for e in self.events[self._last_printed_idx:]:
             dur = f"({e.duration:.2f}s)" if e.duration > 0 else ""
             print(f"{DIM}[{e.event_type.upper()}] {e.name} {dur}{RESET}")
             
@@ -127,6 +114,13 @@ class TraceManager:
                 print(f"{DIM}  Out: {out}{RESET}")
         
         print(f"{DIM}{'='*60}{RESET}\n")
+        self._last_printed_idx = len(self.events)
+
+    def clear(self):
+        """Reset the event history."""
+        self.events = []
+        self.active_traces = {}
+        self._last_printed_idx = 0
 
 
 # Global tracer instance

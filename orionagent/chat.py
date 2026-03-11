@@ -3,10 +3,10 @@
 Usage:
 
     from orionagent import Agent, Manager, chat
-    from orionagent.models import GeminiProvider
+    from orionagent.models import Gemini
 
     # Single agent chat:
-    agent = Agent(name="bot", role="assistant", model=GeminiProvider(...))
+    agent = Agent(name="bot", role="assistant", model=Gemini(...))
     chat(agent)
 
     # Multi-agent chat:

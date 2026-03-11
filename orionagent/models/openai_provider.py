@@ -10,7 +10,7 @@ from typing import Any, Generator, Optional, List
 from orionagent.models.base_provider import ModelProvider
 from orionagent.tools.base_tool import Tool
 
-class OpenAIProvider(ModelProvider):
+class OpenAI(ModelProvider):
     """LLM provider backed by OpenAI (GPT models)."""
 
     def __init__(

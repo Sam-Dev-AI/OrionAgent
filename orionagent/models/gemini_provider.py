@@ -12,7 +12,7 @@ from orionagent.models.base_provider import ModelProvider
 from orionagent.tools.base_tool import Tool
 
 
-class GeminiProvider(ModelProvider):
+class Gemini(ModelProvider):
     """LLM provider backed by Google Gemini."""
 
     def __init__(

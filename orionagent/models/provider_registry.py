@@ -18,20 +18,20 @@ _PROVIDERS: Dict[str, Type[ModelProvider]] = {}
 def _register_builtins() -> None:
     """Lazily register the providers that ship with OrionAI."""
     try:
-        from orionagent.models.gemini_provider import GeminiProvider
-        _PROVIDERS["gemini"] = GeminiProvider
+        from orionagent.models.gemini_provider import Gemini
+        _PROVIDERS["gemini"] = Gemini
     except Exception:
         pass
 
     try:
-        from orionagent.models.openai_provider import OpenAIProvider
-        _PROVIDERS["openai"] = OpenAIProvider
+        from orionagent.models.openai_provider import OpenAI
+        _PROVIDERS["openai"] = OpenAI
     except Exception:
         pass
 
     try:
-        from orionagent.models.ollama_provider import OllamaProvider
-        _PROVIDERS["ollama"] = OllamaProvider
+        from orionagent.models.ollama_provider import Ollama
+        _PROVIDERS["ollama"] = Ollama
     except Exception:
         pass
 
