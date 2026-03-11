@@ -1,0 +1,262 @@
+"""Base agent module for OrionAI.
+
+system_instruction is stored once on the agent and passed to the
+provider on every ask() call via the provider-native mechanism
+(Gemini: GenerateContentConfig, OpenAI: system role, Ollama: system field).
+This means those tokens are NOT re-billed per call -- significant savings
+on long-running agents.
+"""
+
+from typing import Generator, List, Optional, Union, Callable, Dict, Any
+from orionagent.tools.base_tool import Tool
+from orionagent.tools.tool_executor import ToolExecutor
+from orionagent.models.base_provider import ModelProvider
+from orionagent.tools.memory_tools import SaveMemoryTool, SearchMemoryTool
+
+# New memory imports
+from orionagent.memory.config import MemoryConfig
+from orionagent.memory.session import SessionManager, Session
+from orionagent.memory.manager import MemoryPipeline, AgentMemoryProxy
+from orionagent.memory.storage.sqlite_storage import SQLiteStorage
+
+
+class Agent:
+    """Base class for every OrionAI agent.
+
+    Args:
+        name:               Unique name for the agent.
+        role:               Short role description (used for routing).
+        description:        Longer description of capabilities.
+        system_instruction: Persistent system prompt (token-efficient).
+        tools:              List of Tool objects this agent can use.
+        use_default_tools:  If True, auto-load all 5 built-in tools.
+        model:              LLM provider instance.
+        memory:             Memory config string ("none", "session", "persistent") or dict.
+        user_id:            User identifier for memory scoping.
+        strategy:           Strategy name(s) for self-learning/planning.
+        max_refinements:    Max retries for self-learn strategy.
+    """
+
+    def __init__(
+        self,
+        name: str = "Assistant",
+        role: str = "AI Assistant",
+        description: str = "",
+        system_instruction: Optional[str] = None,
+        tools: Optional[List[Tool]] = None,
+        use_default_tools: bool = False,
+        model: Optional[Union[str, ModelProvider]] = None,
+        memory: Optional[Union[str, Dict[str, Any], MemoryConfig]] = None,
+        user_id: str = "default_user",
+        strategy: Optional[Union[str, List[str]]] = None,
+        max_refinements: int = 2,
+        guards: Optional[List[Union[str, Callable]]] = None,
+        verbose: bool = False,
+    ):
+        self.name = name
+        self.role = role
+        self.description = description
+        self.system_instruction = system_instruction
+        
+        if isinstance(model, str):
+            from orionagent.models.model import Model
+            self.model = Model(provider=model)
+        else:
+            self.model = model
+            
+        self.user_id = user_id
+        self.verbose = verbose
+
+        # --- Memory setup ---
+        if isinstance(memory, MemoryConfig):
+            self.memory_config = memory
+        elif isinstance(memory, str):
+            self.memory_config = MemoryConfig(mode=memory)
+        elif isinstance(memory, dict):
+            self.memory_config = MemoryConfig.from_dict(memory)
+        elif memory is None:
+            self.memory_config = MemoryConfig(mode="session")
+        else:
+            self.memory_config = MemoryConfig(mode="session")
+            
+        import os
+        self._session_manager = SessionManager(base_dir=self.memory_config.storage_path)
+        db_file = os.path.join(self.memory_config.storage_path, "orionagent.db")
+        self._persistent_db = SQLiteStorage(db_path=db_file) if self.memory_config.mode == "persistent" else None
+        self._memory_pipeline = MemoryPipeline(self.memory_config, self._persistent_db)
+        
+        # Public proxy for developers to call agent.memory.view(), etc.
+        self.memory = AgentMemoryProxy(self)
+
+        # --- Tool setup ---
+        self.tools = list(tools) if tools else []
+
+        if use_default_tools:
+            self._merge_default_tools()
+
+        self.tool_executor = ToolExecutor()
+
+        # --- Strategy ---
+        from orionagent.agents.strategies import get_strategy
+        self._strategy = get_strategy(strategy, max_refinements=max_refinements)
+
+        # --- Logic Guards (Simple DX) ---
+        if guards:
+            from orionagent.agents.guards import apply_guards
+            self.ask = apply_guards(self.ask, guards)
+
+        # --- Memory tools (auto-injected) ---
+        if self.memory_config.mode == "persistent":
+            self.tools.append(SaveMemoryTool(self.memory, self.user_id))
+            self.tools.append(SearchMemoryTool(self.memory, self.user_id))
+
+    # ------------------------------------------------------------------
+    # Default tools auto-loading
+    # ------------------------------------------------------------------
+
+    def _merge_default_tools(self):
+        """Merge built-in tools, skipping any already present by name."""
+        from orionagent.tools import default_tools
+
+        existing_names = {t.name for t in self.tools}
+        for dt in default_tools:
+            if dt.name not in existing_names:
+                self.tools.append(dt)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def ask(
+        self,
+        task: str,
+        stream: bool = True,
+        use_strategy: bool = True,
+        session_id: Optional[str] = None,
+        record_memory: bool = True,
+    ) -> Union[str, Generator[str, None, None]]:
+        """Execute a task."""
+        from orionagent.tracing import tracer
+        trace_id = tracer.start_trace("agent_ask", self.name, task)
+
+        # Session loading
+        sid = session_id or self._session_manager.auto(self.user_id, self.name)
+        session = self._session_manager.load(self.user_id, self.name, sid)
+        if not session:
+            session = Session(self.user_id, self.name, sid)
+
+        prompt = task
+        if self.memory_config.mode != "none":
+            if record_memory:
+                self._memory_pipeline.process_turn(session, "user", task, self.model)
+            context = self._memory_pipeline.build_context(session, current_task=task)
+            if context:
+                prompt = f"{context}\n\n==== CURRENT TASK ====\n{task}"
+
+        if use_strategy and self._strategy:
+            res = self._strategy.execute(
+                task=prompt,
+                agents=[self],
+                model=self.model,
+                system_instruction=self.system_instruction,
+                temperature=None,
+                tools=self.tools,
+                stream=stream
+            )
+            # Log the intent (result) if not streaming. If streaming, the strategy handles generator.
+            if not stream:
+                if self.memory_config.mode != "none" and record_memory:
+                    self._memory_pipeline.process_turn(session, "assistant", res, self.model)
+                tracer.end_trace(trace_id, res)
+            
+            # Since strategies yield directly if stream=True, we must wrap it to log
+            if stream:
+                def _trace_generator_strategy():
+                    full_res = []
+                    for chunk in res:
+                        full_res.append(chunk)
+                        yield chunk
+                    res_str = "".join(full_res)
+                    if self.memory_config.mode != "none" and record_memory:
+                        self._memory_pipeline.process_turn(session, "assistant", res_str, self.model)
+                    tracer.end_trace(trace_id, res_str)
+                    if self.verbose: tracer.print_summary()
+                return _trace_generator_strategy()
+                
+            return res
+
+        if stream:
+            # For streaming, we wrap the generator to end the trace
+            def _trace_generator():
+                full_res = []
+                for chunk in self._ask_stream(prompt, session):
+                    full_res.append(chunk)
+                    yield chunk
+                res_str = "".join(full_res)
+                if self.memory_config.mode != "none" and record_memory:
+                    self._memory_pipeline.process_turn(session, "assistant", res_str, self.model)
+                tracer.end_trace(trace_id, res_str)
+                if self.verbose:
+                    tracer.print_summary()
+            return _trace_generator()
+
+        res = self._ask_full(prompt, session)
+        if self.memory_config.mode != "none" and record_memory:
+            self._memory_pipeline.process_turn(session, "assistant", res, self.model)
+        tracer.end_trace(trace_id, res)
+        
+        if self.verbose:
+            tracer.print_summary()
+            
+        return res
+
+    def chat(self, greeting: str = None, session_id: Optional[str] = None):
+        """Starts an interactive chat session with this agent."""
+        from orionagent.chat import chat
+        return chat(self, greeting=greeting, session_id=session_id)
+
+    # ------------------------------------------------------------------
+    # Tool access
+    # ------------------------------------------------------------------
+
+    def use_tool(self, tool_name: str, input_data) -> str:
+        """Run a tool via the centralised ToolExecutor."""
+        from orionagent.tracing import tracer
+        trace_id = tracer.start_trace("tool_call_agent", tool_name, input_data)
+        res = self.tool_executor.execute(tool_name, input_data, self.tools)
+        tracer.end_trace(trace_id, res)
+        return res
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _ask_full(self, prompt: str, session: Session) -> str:
+        if self.model:
+            response = self.model.generate(
+                prompt=prompt,
+                system_instruction=self.system_instruction,
+                tools=self.tools if self.tools else None,
+            )
+            # Log agent's response to memory only if we are the leaf execution
+            # But actually, the top-level ask will log the assistant response if record_memory is True,
+            # or we log it here if record_memory is passed down.
+            # We don't have record_memory in _ask_full. Let's pass it!
+            return response
+
+        return f"{self.name} processing task: {prompt}"
+
+    def _ask_stream(self, prompt: str, session: Session) -> Generator[str, None, None]:
+        if self.model:
+            full_response = []
+            for chunk in self.model.generate_stream(
+                prompt=prompt,
+                system_instruction=self.system_instruction,
+                tools=self.tools if self.tools else None,
+            ):
+                full_response.append(chunk)
+                yield chunk
+
+            # Handled similarly.
+        else:
+            yield f"{self.name} processing task: {prompt}"
