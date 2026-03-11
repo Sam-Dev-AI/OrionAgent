@@ -115,36 +115,69 @@ manager.chat("Draft a technical report on 2024 industrial AI trends.")
 OrionAgent utilizes a granular, declarative configuration system built for industrial-scale reliability. Below is a deep dive into the core execution variables that power the framework.
 
 ### 1. Deterministic Logic Guardrails
-Guardrails act as a real-time auditor for agent outputs, ensuring every response adheres to mission-critical constraints.
-- **`guards`**: A list of filters applied to the agent's response.
-    - **`json`**: Forces the output into a valid JSON schema.
-    - **`straight`**: Removes conversational filler and "fluff" for practical excellence.
-    - **`polite`**: Ensures professional and courteous communication.
-    - **`short` / `long`**: Controls output density for specific UI or bandwidth requirements.
-- **`max_refinements`**: The maximum number of self-correction loops allowed. This prevents infinite loops while guaranteeing high-quality output (Default: `2`).
+Guardrails act as a real-time auditor for agent outputs. They are applied as a declarative list of strings or custom functions.
+
+```python
+agent = Agent(
+    guards=["straight", "short", "json"], # Apply specific validators
+    max_refinements=3                     # Max attempts for self-correction
+)
+```
+- **`json`**: Forces output into a valid JSON schema.
+- **`straight`**: Removes "fluff" (e.g. "I hope this helps") and emojis.
+- **`short` / `long`**: Strictly controls the sentence count/density.
 
 ### 2. Multi-Tier Memory Systems
-Persistence is a first-class citizen in OrionAgent. You can choose the persistence tier that fits your mission's longevity requirements.
-- **`none`**: (Transient) No data is stored between turns. Ideal for privacy-first or stateless utility calls.
-- **`session`**: (Short-Term) Retains raw conversation history in a structured sliding window for immediate precision.
-- **`persistent`**: (Long-Term) Automatically distills and stores facts into a **Hierarchical SQLite** database, creating a growing knowledge base for the agent.
+Control exactly how your agents retain knowledge. Use the simple string shorthand or a full `MemoryConfig` for custom storage.
+
+```python
+# Shorthand usage
+agent = Agent(memory="persistent")
+
+# Advanced configuration with custom storage path
+from orionagent import MemoryConfig
+agent = Agent(
+    memory=MemoryConfig(
+        mode="persistent", 
+        storage_path="./data/shared_memory"
+    )
+)
+```
+- **`none`**: Stateless. No data stored (ideal for utilities).
+- **`session`**: Short-term. Remembers raw turn history for context.
+- **`persistent`**: Long-term. Persists facts into an optimized SQLite DB.
 
 ### 3. Strategic Orchestration (`strategy`)
-The `Manager` employs recursive strategy loops to decompose and execute complex goals:
-- **`planning`**: Decomposes a high-level goal into a deterministic array of parallelizable tasks, creating a clear execution roadmap.
-- **`self_learn`**: The **Orion Verdict Loop**. If an agent produces an inadequate result or fails a guard, the Manager dynamically evaluates the failure and re-delegates with corrected context.
+The `Manager` employs recursive strategy loops to decompose and execute complex goals.
+
+```python
+manager = Manager(
+    agents=[researcher, analyst],
+    strategy=["planning", "self_learn"], # Chain multiple strategies
+    max_refinements=2                    # Self-correction limit
+)
+```
+- **`planning`**: Decomposes a goal into a roadmap of parallel tasks.
+- **`self_learn`**: Executes the **Verdict Loop**—evaluating results and re-delegating with corrected context if quality fails.
 
 ### 4. High-Performance Execution Engine
-OrionAgent is engineered for extreme efficiency, significantly reducing the "abstraction tax" of traditional frameworks:
+OrionAgent is engineered for zero-latency. Control core performance variables directly:
 
-- **Real-Time Streaming (`streaming=True`)**: Enabled by default. All model providers support native chunk-level output for zero-latency UI responsiveness.
-- **Concurrent Execution (`async_mode=True`)**: Orchestration strategies and tool execution run in parallel by default. Verified to **reduce execution time by up to 60%** for complex tasks by utilizing modern Python concurrency.
-- **Industrial Debug Mode (`debug=True`)**: Enables real-time, terminal-optimized logs showing the agent's internal reasoning *as it happens*. Perfect for deep-web research and complex tool debugging.
-    - `[PLAN]` : Strategy selection and task decomposition.
-    - `[TOOL]` : Real-time tool execution and argument monitoring.
-    - `[GUARD]` : LogicGuard validation and self-correction cycles.
-    - `[MEMORY]` : Knowledge retrieval and persistent storage updates.
-- **Sleek Observability (`verbose=True`)**: Provides a unified, professional trace summary after execution, showing timing, pathing, and token usage in a compact format.
+```python
+# 1. Enable token usage tracking on the model level
+llm = Gemini(model_name="gemini-2.0-flash", token_count=True)
+
+# 2. Control execution speed and streaming
+agent = Agent(
+    model=llm,
+    async_mode=True, # Enable parallel tool calls & strategy steps
+    debug=True       # Real-time 'Industrial' reasoning logs
+)
+```
+
+- **`token_count=True`**: Tracks input/output tokens for precise cost monitoring.
+- **`async_mode=True`**: Executes independent tasks in parallel (up to 60% faster).
+- **`debug=True`**: Enables live `[PLAN]`, `[TOOL]`, `[GUARD]` tags in terminal.
 
 ---
 
