@@ -36,6 +36,16 @@ OrionAgent is designed to eliminate the **black box** complexity of modern agent
 
 ---
 
+## Installation
+
+Install OrionAgent via pip for immediate industrial-grade orchestration:
+
+```bash
+pip install orionagent
+```
+
+---
+
 ## Quick Start
 
 ### Single Agent Integration
