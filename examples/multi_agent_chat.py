@@ -58,7 +58,7 @@ def main():
     )
 
     print("\n" + "="*50)
-    print("ORIONAI: MULTI-AGENT SWARM ORCHESTRATION")
+    print("ORIONAGENT: MULTI-AGENT SWARM ORCHESTRATION")
     print("="*52)
     print("MODE: Autonomous Planning + Self-Learning Verdicts")
     print("GOAL: Demonstrate cross-agent cooperation and shared memory.\n")

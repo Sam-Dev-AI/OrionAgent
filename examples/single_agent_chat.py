@@ -38,7 +38,7 @@ def calculate_roi(investment: float, revenue: float):
 
 def main():
     # 3. INITIALIZE THE CORE ENGINE
-    # OrionAgent uses provider-native drivers for maximum speed.
+    # OrionAgent supports multiple providers (Gemini, OpenAI, Ollama).
     llm = Gemini(model_name="gemini-2.0-flash", token_count=True)
 
     # 4. DEFINE THE 'VANGUARD' AGENT
@@ -56,7 +56,7 @@ def main():
     )
 
     print("\n" + "="*50)
-    print("ORIONAI: THE SOVEREIGN AGENT FRAMEWORK")
+    print("ORIONAGENT: THE SOVEREIGN AGENT FRAMEWORK")
     print("="*52)
     print("FEATURES: Persistence + Logic Guards + Multi-Tooling")
     print("STRATEGY: Single Agent Power-Loop")

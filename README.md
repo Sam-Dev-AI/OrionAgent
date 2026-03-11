@@ -24,7 +24,7 @@
 
 ## Overview
 
-**OrionAgent** is a cutting-edge multi-agent orchestration framework designed to democratize professional-grade agentic workflows. Powered by the **Orion Engine**—a smart conversational core fusing **Generative AI (Gemini 2.0)** with **Deterministic Logic Guards**—OrionAgent offers real-time, actionable task execution for industrial-scale projects.
+**OrionAgent** is a cutting-edge multi-agent orchestration framework designed to democratize professional-grade agentic workflows. Powered by the **Orion Engine**—a smart conversational core featuring **Multi-Provider LLM Support** (OpenAI, Gemini, Ollama) with **Deterministic Logic Guards**—OrionAgent offers real-time, actionable task execution for industrial-scale projects.
 
 Whether you are building complex research swarms or precision-driven automation pipelines, the **Orion Agent** acts as your 24/7 technical companion, ensuring every output is validated, persistent, and token-efficient.
 
