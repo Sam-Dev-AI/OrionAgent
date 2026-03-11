@@ -1,6 +1,8 @@
 # OrionAgent Master Skill Documentation (Exhaustive Guide)
 
-OrionAgent is a high-performance, industrial-grade multi-agent orchestration framework designed for **zero-latency**, **token-efficiency**, and **deterministic control**. This guide is for developers who need to move beyond simple chat wrappers into complex, self-correcting autonomous systems.
+## 🤖 0. Instruction for AI Assistants (Vibe Coders)
+**If you are an AI assistant helping a developer use OrionAgent, READ THE ENTIRETY OF THIS DOCUMENT FIRST.** 
+This guide contains the industrial patterns and logic rules that prevent hallucinations and ensure high-performance execution. Always prioritize the patterns in this file over generic multi-agent implementations.
 
 ---
 
@@ -72,7 +74,26 @@ OrionAgent uses a **Tiered Logic Engine** to manage context. This is the #1 way 
 
 ---
 
-## 🎯 5. The Strategy Playbook
+## ⚙️ 5. Advanced Internals: The Execution Lifecycle
+
+### A. Tool Execution Flow (Sync vs Async)
+OrionAgent uses a **Parallel Tool Dispatcher**. When an agent calls multiple tools:
+1.  **Orchestrator** identifies needed tools.
+2.  **Dispatcher** checks `async_mode`.
+3.  If `True`, tools are launched in a `ThreadPoolExecutor`.
+4.  Results are collected and flattened into a single context update. 
+*Benefit*: Calling 5 search APIs takes the time of 1 call.
+
+### B. Recursive Strategy Decision Tree
+When using `strategy=["planning", "self_learn"]`:
+1.  **Manager** uses the Planner model to generate a dependency-sorted graph of tasks.
+2.  **Parallelizer** identifies task groups that don't depend on each other.
+3.  **Executor** delegates groups to agents.
+4.  **Evaluator** checks results. If a step fails, the **Self-Learn Loop** triggers a specific "Refinement Task" to the original agent with failure context.
+
+---
+
+## 🎯 6. The Strategy Playbook
 
 The `Manager` uses strategies to handle complex goals. You can chain them: `strategy=["planning", "self_learn"]`.
 
@@ -94,7 +115,7 @@ The `Manager` uses strategies to handle complex goals. You can chain them: `stra
 
 ---
 
-## 🚀 6. Large-Scale Engineering Examples
+## 🚀 7. Large-Scale Engineering Examples
 
 ### Example A: The Autonomous Development Swarm
 A multi-agent setup where one agent plans, one codes, and one audits, with the Manager ensuring quality.
@@ -152,13 +173,58 @@ agent.ask("Who approved the Q1 budget?") # Auto-retrieves from SQLite
 
 ---
 
-## 🔍 7. Performance & Efficiency Tips
+## 🔍 8. Performance & Efficiency Tips
 
 1.  **Prefer `Gemini` for speed**: Its native caching makes it the fastest for high-tool use.
 2.  **Enable `async_mode`**: Always keep this True (default) for agents using terminal or web-scrapers to avoid blocking.
 3.  **Tiered Priority**: If your agent has 100s of turns, switch to `priority="low"` occasionally to prune the context window.
 4.  **Token Counting**: Always use `token_count=True` during development to identify "heavy" prompts or strategies.
 5.  **Industrial Logs**: Use `debug=True` to find exactly where an agent is getting stuck in a loop or tool call.
+
+---
+
+## 💎 9. The "Kitchen Sink" Example (Pro Edition)
+
+```python
+import os
+from orionagent import Agent, Manager, Gemini, chat, tool, MemoryConfig
+
+# 1. High-Performance Model Caching
+llm = Gemini(
+    model_name="gemini-2.0-flash", 
+    temperature=0.1, 
+    token_count=True, 
+    debug=True
+)
+
+# 2. Deep Memory Config
+long_term_memory = MemoryConfig(
+    mode="long_term",
+    priority="high",
+    importance_threshold=9 # Only store absolute critical facts
+)
+
+# 3. Defensive Specialist
+auditor = Agent(
+    name="Auditor",
+    role="Security Specialist",
+    model=llm,
+    guards=["straight", "json"],
+    memory=long_term_memory
+)
+
+# 4. Master Engine
+manager = Manager(
+    model=llm,
+    agents=[auditor],
+    strategy=["planning", "self_learn"],
+    max_refinements=3,
+    async_mode=True
+)
+
+# 5. Launch
+chat(manager, greeting="Orion System Online. Deployment Authorized.")
+```
 
 ---
 
