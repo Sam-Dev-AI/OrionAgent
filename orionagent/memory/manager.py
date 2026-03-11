@@ -20,7 +20,9 @@ class MemoryPipeline:
         # If the LLM has verbose or debug enabled, we log
         is_verbose = getattr(llm, "verbose", False)
         is_debug = getattr(llm, "debug", False)
-        tracer.log_event("memory", f"Storing {role} turn", content[:50], verbose=is_verbose, debug=is_debug)
+        
+        display_content = content[:50] if content else ""
+        tracer.log_event("memory", f"Storing {role} turn", display_content, verbose=is_verbose, debug=is_debug)
 
         session.messages.append({"role": role, "content": content})
         self.session_manager.save(session)

@@ -117,7 +117,8 @@ class Gemini(ModelProvider):
         self._print_token_usage(response.usage_metadata)
 
         # Handle tool calls
-        if response.candidates[0].content.parts[0].function_call:
+        has_function_call = any(part.function_call for part in response.candidates[0].content.parts)
+        if has_function_call:
             from orionagent.tools.tool_executor import ToolExecutor
             executor = ToolExecutor()
             
@@ -179,9 +180,9 @@ class Gemini(ModelProvider):
 
         full_content = []
         for chunk in stream:
-            # We must check for function calls in the first chunk or combined chunks
-            # In Gemini, if it's a tool call, it's usually the whole chunk.
-            if chunk.candidates[0].content.parts[0].function_call:
+            # Check for function calls in any part of the candidate
+            has_function_call = any(part.function_call for part in chunk.candidates[0].content.parts)
+            if has_function_call:
                 # Tool call detected in stream.
                 # Logic: collect all chunks, execute, then re-call generate
                 # But typically Gemini tool calls are non-streaming in the functional part.

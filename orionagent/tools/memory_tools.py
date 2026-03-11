@@ -22,12 +22,24 @@ class SaveMemoryTool(Tool):
     }
 
     def __init__(self, memory_proxy: AgentMemoryProxy, user_id: str):
+        super().__init__(
+            name=self.name,
+            description=self.description,
+            parameters=self.parameters
+        )
         self.memory = memory_proxy
         self.user_id = user_id
 
-    def execute(self, **kwargs) -> str:
-        content = kwargs.get("content")
-        category = kwargs.get("category", "general")
+    def run(self, input_data: dict) -> str:
+        if isinstance(input_data, str):
+            import json
+            try:
+                input_data = json.loads(input_data)
+            except:
+                return f"Failed: Invalid JSON input: {input_data}"
+                
+        content = input_data.get("content")
+        category = input_data.get("category", "general")
         
         if not content:
             return "Failed: Content to save must be provided."
@@ -53,16 +65,27 @@ class SearchMemoryTool(Tool):
     }
 
     def __init__(self, memory_proxy: AgentMemoryProxy, user_id: str):
+        super().__init__(
+            name=self.name,
+            description=self.description,
+            parameters=self.parameters
+        )
         self.memory = memory_proxy
         self.user_id = user_id
 
-    def execute(self, **kwargs) -> str:
-        query = kwargs.get("query")
+    def run(self, input_data: dict) -> str:
+        if isinstance(input_data, str):
+            import json
+            try:
+                input_data = json.loads(input_data)
+            except:
+                return f"Failed: Invalid JSON input: {input_data}"
+
+        query = input_data.get("query")
         if not query:
             return "Failed: Search query must be provided."
             
         # Actually we need to search using the agent's persistent db directly
-        # because the proxy view() method brings up all limit. But since we need query based:
         db = self.memory._get_persistent_db()
         if not db:
             return "Failed: Persistent memory is not enabled."

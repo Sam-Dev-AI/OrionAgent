@@ -78,11 +78,21 @@ class BaseStrategy:
         best_agent, best_score = agents[0], 0
         for agent in agents:
             # Extract whole words from agent metadata
-            agent_text = f"{agent.role} {agent.description}".lower()
+            # Include system_instruction if description is sparse to help with role-targeted intent
+            agent_text = f"{agent.role} {agent.description} {agent.system_instruction or ''}".lower()
             agent_words = set(re.findall(r'\b\w+\b', agent_text))
             
             # Score based on whole-word intersection
-            score = len(meaningful_task_words.intersection(agent_words))
+            # We also check for singular/plural matches for 'lead'/'leads' by checking prefixes for meaningful words
+            score = 0
+            for tw in meaningful_task_words:
+                if tw in agent_words:
+                    score += 2 # Exact match worth more
+                else:
+                    # Partial match for common terms like lead/leads
+                    for aw in agent_words:
+                        if (len(tw) > 3 and tw.startswith(aw)) or (len(aw) > 3 and aw.startswith(tw)):
+                            score += 1
             
             if score > best_score:
                 best_score, best_agent = score, agent
@@ -97,14 +107,14 @@ class BaseStrategy:
         Bypasses planning and self-learning for simple conversational turns.
         """
         words = len(task.split())
-        if words > 25:
+        if words > 15:
             return True
         
         # Check for sequencing or complexity indicators
         complex_keywords = [
             "and", "then", "after", "first", "finally", 
             "research", "compare", "summary", "outline",
-            "plan", "steps"
+            "plan", "steps", "find", "extract", "leads", "businesses"
         ]
         task_lower = task.lower()
         if any(kw in task_lower for kw in complex_keywords):
