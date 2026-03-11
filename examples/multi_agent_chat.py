@@ -1,14 +1,15 @@
 """
-Multi-Agent Orchestration -- Autonomous Delegation & Self-Correction
+OrionAI: Autonomous Multi-Agent Orchestration
+Advanced Delegation, Planning & Self-Correction.
 
-This script demonstrates the 'Manager' pattern, where a central brain coordinates
-specialized agents using the 'self_learn' strategy.
+This script demonstrates the 'Manager' pattern, where a central brain coordinates 
+specialized agents using the combined 'planning' and 'self_learn' strategy.
 
-Key Features:
-- Autonomous Task Delegation: Manager routes tasks to the best agent.
-- Strategy-Based Planning: Multi-turn self-correction and evaluation.
-- Shared Context: Agents share session and persistent memory.
-- Token Efficiency: System instructions are shared across agent turns.
+Key Advantages vs LangChain/AutoGen:
+1. Zero-Magic Orchestration: You control the exact strategy (Planning + Self-Learn).
+2. Logic Guards: Every agent output is evaluated for quality before moving to the next step.
+3. Token Optimization: Shared system instructions and context.
+4. Long-Term Memory: Shared knowledge via persistent SQLite storage.
 """
 
 import os
@@ -18,46 +19,53 @@ from orionagent import Agent, Manager, Gemini
 os.environ["GEMINI_API_KEY"] = "Your_API_Key"
 
 def main():
-    # 2. INITIALIZE CENTRAL MODEL
+    # 2. INITIALIZE CENTRAL BRAIN
+    # The Manager uses this model to devise plans and evaluate agent outputs.
     llm = Gemini(model_name="gemini-2.0-flash", token_count=True)
 
     # 3. DEFINE SPECIALIZED AGENTS
     researcher = Agent(
-        name="researcher",
+        name="Quill-Researcher",
         role="Technical Researcher",
-        description="Expert at finding deep technical facts using web search tools.",
+        description="Expert at deep-web technical research and data extraction.",
         memory="session",
-        use_default_tools=True,
+        use_default_tools=True,    # Auto-loads Web, Terminal, Python tools
+        guards=["straight"],        # Enforcement: No emojis/fluff in data
         verbose=True
     )
 
-    writer = Agent(
-        name="writer",
-        role="Creative Content Writer",
-        description="Transforms raw technical facts into engaging, detailed articles.",
-        memory="persistent", # Remembers previous writing styles/facts across runs
-        guards=["happy", "long"], # Enforces enthusiastic tone and detailed responses
+    analyst = Agent(
+        name="Logic-Analyst",
+        role="Business Strategy Consultant",
+        description="Analyzes raw data to extract ROI, risks, and strategic trends.",
+        memory="persistent",       # Retains business logic context across runs
+        guards=["short", "straight"], # Enforcement: Brief, no emoji, professional tone
         verbose=True
     )
 
     # 4. DEFINE THE MANAGER
-    # The Manager acts as the orchestrator for the multi-agent system.
+    # The Manager acts as the orchestrator. By combining 'planning' and 'self_learn',
+    # it first breaks the goal into steps and then evaluates each step for quality.
     manager = Manager(
-        name="Orion-Manager",
+        name="Orion-Supreme",
         model=llm,
-        strategy="self_learn",  # ADVANCED: Evaluates agent output and re-delegates if quality is low.
-        agents=[researcher, writer],
+    # 🛡️ ADVANCED: Combined Strategy
+        # 'planning'   -> Decomposes the task into a logical roadmap.
+        # 'self_learn' -> Quality control. If an agent fails the 'verdict', Manager re-delegates.
+        strategy=["planning", "self_learn"], 
+        agents=[researcher, analyst],
         verbose=True            # Enables beautiful orchestration traces
     )
 
     print("\n" + "="*50)
-    print("🚀 ORIONAGENT MULTI-AGENT ORCHESTRATION")
-    print("="*50)
-    print("DEMOS: Self-Learn Strategy + Agent Cooperation + Shared Memory")
-    print("USAGE: Ask a complex task that requires research and writing.\n")
+    print("ORIONAI: MULTI-AGENT SWARM ORCHESTRATION")
+    print("="*52)
+    print("MODE: Autonomous Planning + Self-Learning Verdicts")
+    print("GOAL: Demonstrate cross-agent cooperation and shared memory.\n")
 
-    # 5. START INTERACTIVE SESSION
-    manager.chat("How can I help you coordinate your agents today?")
+    # 5. START INTERACTIVE MISSION
+    # The manager will plan the research and analysis phases autonomously.
+    manager.chat("How can I help you coordinate your intelligence swarm today?")
 
 if __name__ == "__main__":
     main()

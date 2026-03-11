@@ -1,8 +1,6 @@
-# 🌌 OrionAI
+# OrionAI
 
 <div align="center">
-
-![OrionAI Banner](https://img.shields.io/badge/OrionAI-The%20Sovereign%20Multi--Agent%20Framework-blueviolet?style=for-the-badge)
 
 **A minimalistic yet industrially robust multi-agent orchestration framework. Precision-engineered for memory persistence, logic validation, and autonomous self-correction.**
 
@@ -10,210 +8,166 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[Quick Start](#-quick-start) • [Architecture](#-architecture-blueprints) • [Features & Variables](#-features--core-variables) • [OrionAI vs Others](#-orionagent-vs-langchain--autogen) • [Agent Guide](#-the-agent-api)
+[Quick Start](#quick-start) • [Architecture](#architecture-blueprints) • [Memory System](#memory-tier-deep-dive) • [Orchestration](#orchestration-strategies) • [OrionAI vs Others](#orionagent-vs-langchain--autogen)
 
 </div>
 
 ---
 
-## 🔥 Why OrionAI?
+## Why OrionAI?
 
-OrionAI is built for developers who need **absolute control** over agent behavior without the overhead of heavy abstractions. It combines the simplicity of a micro-framework with advanced features like **token-efficient system instructions**, **hierarchical summarization memory**, and **deterministic logic guards**.
+OrionAI is designed to eliminate the "black box" complexity of modern agent frameworks. It provides a low-abstraction, high-control environment for building agents that are **token-efficient**, **persistent by default**, and **deterministic via logic guards**.
 
-### 🌟 Sovereign Features
-- **🛡️ Deterministic Guards**: Enforce JSON schemas, tone, or length before a response leaves the agent.
-- **🤖 Autonomous Orchestration**: Swap between structured `Planning` and recursive `Self-Learn` loops.
-- **💾 Strategic Memory**: Hierarchical pipelines that distill conversations into long-term SQLite knowledge.
-- **⚡ Token Optimization**: Persistent system instructions for Gemini/OpenAI save thousands of context tokens.
-- **🔌 Multi-Provider Native**: First-class support for **Gemini 2.0**, **GPT-4o**, and **Local Ollama**.
+### Sovereign Features
+- **Deterministic Guards**: Enforce JSON schemas, tone, or length before a response leaves the agent.
+- **Autonomous Orchestration**: Multi-strategy engine supporting structured Planning and recursive Self-Learning.
+- **Strategic Memory**: Hierarchical pipelines that distill conversations into long-term SQLite knowledge.
+- **Token Optimization**: Native provider system instructions and shared context pruning.
+- **Multi-Provider Native**: First-class support for Gemini 2.0, GPT-4o, and Local Ollama (Qwen2.5/Llama3).
 
 ---
 
-## 🏗️ Architecture Blueprints
+## Architecture Blueprints
 
-OrionAI's architecture is designed to be highly modular, separating the LLM intelligence engine from the orchestration, memory, and tooling layers.
+The framework is built on a decoupled architecture that separates intent (Manager) from execution (Agent) and state (Memory).
 
+### System Data Flow
 ```text
-┌────────────────────────────────────────────────────────┐
-│                 User Application / Goal                │
-└───────────────────────────┬────────────────────────────┘
-                            │ 1. Submits Task
-┌───────────────────────────▼────────────────────────────┐
-│ 👔 MANAGER LAYER (Orchestration)                       │
-│                                                        │
-│  [Strategy Engine]  ──────────▶  [Agent Dispatcher]    │
-│  (Planning & Self-Learn)         (Routes sub-tasks)    │
-└───────────────────────────┬────────────────────────────┘
-                            │ 2. Delegates
-┌───────────────────────────▼────────────────────────────┐
-│ 🤖 AGENT CORE (Execution & Validation)                 │
-│                                                        │
-│  [Logic Guards]     ──────────▶  [Tool Registry]       │
-│  (Enforces Format/Tone)          (Web/Terminal/Files)  │
-└─────────────────┬──────────────────────┬───────────────┘
-                  │ 3. Prompts Model     │ 4. Reads/Writes State
-┌─────────────────▼────────┐  ┌──────────▼───────────────┐
-│ 🧠 INTELLIGENCE TIER     │  │ 💾 STATE & MEMORY TIER   │
-│                          │  │                          │
-│  • Cloud: Gemini/GPT-4   │  │  • Session RAM (Short)   │
-│  • Local: Ollama Native  │  │  • SQLite DB (Long-term) │
-└──────────────────────────┘  └──────────────────────────┘
+[ USER GOAL ] 
+      │
+      ▼
+┌───────────────────┐      ┌──────────────────────────┐
+│ MANAGER           │◄────▶│ ORCHESTRATION STRATEGY   │ (Planning / Self-Learn)
+│ (The Orchestrator)│      └──────────────────────────┘
+└─────────┬─────────┘
+          │ (Delegates Sub-Tasks)
+          ▼
+┌───────────────────┐      ┌──────────────────────────┐
+│ AGENT             │◄────▶│ TOOL REGISTRY            │ (Web, Python, Terminal)
+│ (The Worker)      │      └──────────────────────────┘
+└─────────┬─────────┘
+          │ (Validation Loop)
+          ▼
+┌───────────────────┐      ┌──────────────────────────┐
+│ LOGIC GUARDS      │─────▶│ MEMORY TIER              │ (Session / SQLite)
+│ (The Feedback)    │      └──────────────────────────┘
+└───────────────────┘
 ```
 
 ---
 
-## 🥊 OrionAI vs LangChain & AutoGen
+## Quick Start
 
-Why choose OrionAI over the established giants? OrionAI is built to eliminate the "black box" feeling of modern agent frameworks.
+### 10-Second Example: Single Agent Power
+For simple tasks, the Agent class provides everything you need with minimal boilerplate.
 
-| Feature / Philosophy | 🌌 OrionAI | 🦜🔗 LangChain | 🤖 AutoGen |
-| :--- | :--- | :--- | :--- |
-| **Abstractions** | **Minimalist & Explicit.** You know exactly what is happening under the hood. No hidden prompted API calls. | **Heavy.** Deeply nested abstractions that can make debugging difficult. | **Complex.** Highly capable but involves a steeper learning curve for simple tasks. |
-| **Output Control** | **Deterministic Logic Guards.** If an agent returns bad JSON or the wrong tone, it self-corrects internally before the user ever sees it. | Relies heavily on complex output parsers which can silently fail. | Focuses on multi-agent conversation rather than strict output shaping. |
-| **Memory System** | **Built-in Hierarchical.** Seamlessly cascades from short-term context to long-term SQLite databases via automated summarization. | Requires manual wiring of memory classes (e.g., `ConversationBufferMemory`). | Basic persistent memory; advanced summarization needs custom implementation. |
-| **Use Case** | Teams that want **production-ready reliability**, fast setup, and zero magic. | Connecting massive chains of various tools and data sources. | Complex multi-agent simulations and coding tasks. |
-
----
-
-## 🚀 Quick Start
-
-### 🔌 Complete Installation
-OrionAI requires Python 3.8+. Optimized for asynchronous streaming and tool execution.
-
-```bash
-pip install orionagent
-```
-
-### 🏁 10-Second Example: Detailed Single Agent
 ```python
-from orionagent import Agent, Model, default_tools
+from orionagent import Agent, Gemini, tool
 
-# 1. Choose your brain
-llm = Model(provider="gemini", model="gemini-2.0-flash")
+@tool
+def crypto_ticker(symbol: str):
+    """Fetches real-time prices for crypto assets."""
+    return f"Current {symbol} Price: $65,000 (Mock)"
 
-# 2. Configure your agent
-researcher = Agent(
+# Configured with Persistence and Logic Guards
+agent = Agent(
     name="Vanguard",
-    role="Senior Research Analyst",
-    system_instruction="Provide objective, source-backed data.",
-    model=llm,
-    guards=["straight", "short"], # Logic Guards force specific output formats
-    use_default_tools=True        # Auto-load Terminal, Web, and Files tools
+    role="Research Analyst",
+    model=Gemini("gemini-2.0-flash"),
+    memory="persistent",       # Saves state to SQLite automatically
+    use_default_tools=True,    # Web Search, File, Terminal access
+    tools=[crypto_ticker],
+    guards=["straight", "short"] # Enforces professional tone and brevity
 )
 
-# 3. Ask and Stream
-response = researcher.chat("Summarize the current state of Solid State Batteries.")
-print(response)
+agent.chat("What is the current BTC price and summarize its impact?")
 ```
 
----
-
-## ⚙️ Features & Core Variables
-
-When building with OrionAI, you will primarily interact with the `Agent`, `Manager`, and `Model` classes. Here are the core variables and features you should know:
-
-### 👤 1. The Agent Class (`orionagent.Agent`)
-The fundamental worker unit. It takes instructions, executes tools, and guarantees output quality.
-* **`name`** *(str)*: A unique identifier for the agent (e.g., `"Coder"`). Crucial for multi-agent logging.
-* **`role`** *(str)*: Defines the agent's persona (e.g., `"Python Software Engineer"`).
-* **`model`** *(Model Option)*: The language model instance parsing the tasks.
-* **`system_instruction`** *(str)*: Base rules the agent must always follow. Optimized continuously.
-* **`guards`** *(List[str])* [Optional]: Enforces output schemas. Available built-ins: `"json"`, `"straight"`, `"short"`, `"long"`, `"polite"`, `"happy"`.
-* **`use_default_tools`** *(bool)* [Optional]: Set to `True` to give the agent Web Browsing, File Manipulation, and Terminal access immediately. Default: `False`.
-* **`tools`** *(List[Callable])* [Optional]: A list of custom Python functions decorated with `@tool`. You can easily bind your own backend APIs to the agent.
-* **`memory`** *(str or MemoryConfig)* [Optional]: How the agent remembers. Options: `"none"`, `"session"`, `"long_term"`. Default: `"session"`.
-* **`max_refinements`** *(int)* [Optional]: How many times the agent is allowed to self-correct upon hitting a Logic Guard failure. Default: `2`.
-* **`verbose`** *(bool)* [Optional]: If `True`, the agent prints detailed execution logs including active tool calls, reasoning steps, and token counts constraints to the terminal. Default: `False`.
-
-### 👔 2. The Manager Class (`orionagent.Manager`)
-The orchestrator. It receives a high-level goal, devises a plan, and delegates tasks to `Agents`.
-* **`model`** *(Model Option)*: The manager's personal LLM used strictly for planning and strategy.
-* **`agents`** *(List[Agent])* [Optional]: The team of specialized agents the manager can dispatch tasks to.
-* **`strategy`** *(str)* [Optional]: Dictates how the manager handles goals. 
-  * `"planning"`: Creates a step-by-step checklist and executes it linearly.
-  * `"self-learn"`: Dynamically iterates, evaluates agent outputs, and corrects course until the goal is fully achieved.
-* **`system_instruction`** *(str)* [Optional]: Instructions solely for the Manager to dictate overall team management.
-
-### 🧠 3. The Model Class (`orionagent.Model`)
-A unified interface wrapper for different LLM providers.
-* **`provider`** *(str)*: Defines the AI engine. Supported: `"gemini"`, `"openai"`, or `"ollama"`.
-* **`model`** *(str)*: The specific model string (e.g., `"gemini-2.0-flash"`, `"gpt-4o"`, `"qwen2.5-coder"`).
-
----
-
-## 🛰️ Advanced Capabilities
-
-### Multi-Agent Handoffs
-Agents can autonomously pass control to others. The Manager detects these handoffs and re-routes the task with all context history securely intact.
+### Multi-Agent Showcase: Autonomous Delegation
+The Manager coordinates specialized agents using advanced strategies.
 
 ```python
-from orionagent.tools import trigger_handoff
+from orionagent import Agent, Manager, Gemini
 
-# Agent code triggering a handoff:
-return trigger_handoff(
-    target_agent="Coder", 
-    task="Fix the bug in main.py",
-    brief="Found a syntax error on line 42.",
-    state_json='{"file": "main.py", "line": 42}'
-)
-```
+# Specialized Workers
+researcher = Agent(name="Researcher", role="Technical Scraper", use_default_tools=True)
+writer = Agent(name="Writer", role="Content Strategist", guards=["happy", "long"])
 
-### 🧠 Hierarchical Memory System
-OrionAI features a deeply integrated, highly configurable memory pipeline to ensure your agents maintain context without overflowing their token limits.
-
-#### How It Works:
-1. **Short-Term Buffer (`"session"`)**: Retains the exact, raw back-and-forth turns of the current task in RAM.
-2. **Summarization Pipeline**: When the session hits a predefined token limit, a background LLM process pauses to summarize the oldest messages.
-3. **Long-Term Storage (`"long_term"`)**: Extracted facts, user preferences, and critical context are saved permanently into a local **SQLite Database** (`memory.db`) or a **JSON File**. 
-4. **Vector Injection**: When a new task matches historical context, those facts are automatically injected into the system prompt.
-
-#### Memory Configurations (`MemoryConfig`):
-You can deeply customize this behavior rather than using the default string handles:
-
-```python
-from orionagent import Agent, Model
-from orionagent.memory import MemoryConfig
-
-advanced_memory = MemoryConfig(
-    memory_type="long_term",
-    storage_type="sqlite",       # 'sqlite' or 'json'
-    max_turns=10,                # Starts summarization after 10 turns
-    user_id="user_123",          # Isolate memory context per user
-    storage_path="./agent_db/"   # Custom directory for the DB files
+# The central brain combining Planning and Self-Correction
+manager = Manager(
+    model=Gemini("gemini-2.0-flash"),
+    agents=[researcher, writer],
+    strategy=["planning", "self_learn"] # Plan first, then evaluate results
 )
 
-agent = Agent(name="Recall", role="Assistant", model=Model("openai", "gpt-4o"), memory=advanced_memory)
+manager.chat("Research the latest 2024 AI trends and write a 500-word blog post.")
 ```
 
 ---
 
-## 📂 Project Structure
-```text
-OrionAI/
-├── orionagent/
-│   ├── agents/          # Orchestration: BaseAgent, Manager, Strategies, Guards
-│   ├── models/          # Providers: OpenAI (GPT), Gemini (Google), Ollama (Local)
-│   ├── memory/          # State: Pipeline, SQLiteStorage, JSONStorage, Session
-│   ├── tools/           # Execution: Web, Terminal, Files, Python Sandbox
-│   └── tracing.py       # Observability: Performance & Token Tracing
-├── examples/            # Ready-to-use boilerplate (Memory, Multi-Agent)
-└── test/                # Comprehensive test suite (Pytest)
-```
+## Memory Tier Deep-Dive
+
+OrionAI uses a hierarchical memory pipeline to maintain context without token-bloating.
+
+### 1. Session Memory (Short-Term)
+- **Mechanism**: Stores the raw, exact conversation history for the current session.
+- **Storage**: RAM / JSON.
+- **Use Case**: Immediate back-and-forth context.
+
+### 2. Persistent Memory (Long-Term)
+- **Mechanism**: Extracts key facts, user preferences, and results from previous sessions.
+- **Storage**: SQLite Database (`orionagent.db`).
+- **Optimization**: Uses LLM-based summarization to distill 10,000+ tokens of history into a 200-token "Knowledge Brief".
+- **Isolation**: Supports `user_id` scoping to keep data separate for different end-users.
 
 ---
 
-## 🛣️ Roadmap & Vision
-OrionAI is actively evolving to balance capability with its minimalist philosophy.
-- [ ] **Native Vector Embeddings**: Direct integration with ChromaDB/Qdrant for mass-scale semantic search.
-- [ ] **Observability Dashboard**: A local web UI to visualize real-time handoffs, tool execution latency, and strategy flows.
-- [ ] **Streaming JSON Validation**: Validating output formatting byte-by-byte as the LLM streams it.
-- [ ] **Human-in-the-Loop (HITL)**: Built-in pause/resume states requiring human approval before critical tool executions natively.
-- [ ] **Async Multi-Agent Clusters**: True parallel execution where multiple agents work on independent sub-tasks simultaneously before merging.
+## Orchestration Strategies
 
-**Contributing:** We value every PR. See [CONTRIBUTING.md](CONTRIBUTING.md) for architectural guidelines.
+The Manager uses the **Strategy Engine** to handle complex, multi-step goals.
 
-## ⚖️ License & Contact
-Released under the **MIT License**. Created by [Samir Lade](mailto:ladesamir10@gmail.com).
+### Planning Strategy
+- **How it works**: Decomposes a high-level goal into a JSON task-map (steps).
+- **Parallelism**: Steps that don't depend on each other are executed in parallel (multi-threaded).
+- **Context Pass**: Result of Step A is automatically injected as context for Step B.
+
+### Self-Learn Strategy (The Verdict)
+- **Evaluation Loop**: After an agent completes a task, the Manager runs a 50-token quality check.
+- **Self-Correction**: If the output is poor (Score < 3/5), the Manager re-delegates to a DIFFERENT agent with targeted feedback.
+- **Zero-Token Bypass**: The framework remembers success patterns. For repeated tasks, it skips evaluation to save tokens.
+
+---
+
+## Token Efficiency & Performance
+
+OrionAI is built for production environments where token costs and latency matter.
+
+1. **Native System Instructions**: We use provider-specific system roles (Gemini Context Config, OpenAI System Role). Unlike other frameworks that re-send the system prompt every turn, OrionAI stores it once, saving 500-1000 tokens per interaction.
+2. **Context Pruning**: Old messages are summarized or dropped before hits the LLM's context limit, preventing "context collapse".
+3. **Lazy Model Loading**: Models are only initialized when the first task is received, reducing startup latency.
+
+---
+
+## OrionAI vs LangChain & AutoGen
+
+| Feature | OrionAI | LangChain | AutoGen |
+| :--- | :--- | :--- | :--- |
+| **Philosophy** | Zero-Magic / Explicit | Abstraction-Heavy | Conversational Swarm |
+| **Logic Validation** | Built-in Guards | Needs custom OutputParsers | Limited strict control |
+| **Memory** | Native SQLite Auto-Brief | Manual Buffer wiring | Basic persistence |
+| **Tokens** | Optimized System Prompts | Full history re-sending | High growth in swarms |
+
+---
+
+## Roadmap
+- **Observability Dashboard**: Local Web UI for real-time trace visualization.
+- **Human-in-the-Loop**: Pause points for human approval on dangerous tool calls.
+- **Async Clusters**: True multi-process parallel execution for large-scale tasks.
+
+---
+
+## License & Contact
+Released under the **MIT License**. Created by Samir Lade.
 
 <div align="center">
 

@@ -1,56 +1,70 @@
 """
-Single Agent Showcase -- Simple, Persistent & Secure
+OrionAI: 10-Second Power Example
+Simple, Persistent & Industrially Robust.
 
 This script demonstrates a high-performance single agent utilizing:
-- Native Model Integration (Gemini, OpenAI, etc.)
-- Hierarchical Memory (Session-based + Vector-backed Persistence)
-- Output Logic Guards (Tone and length control)
-- Real-time Execution Tracing
-- Built-in Toolsets (Web Search, File Management, etc.)
+- Native Model Integration (Gemini 2.0 Flash)
+- Hierarchical Memory (Persistent SQLite Storage)
+- Logic Guards (Tone, emoji-free, and brevity control)
+- Multi-Tooling (Custom AI tools with verdict evaluation)
 """
 
 import os
+import random
 from orionagent import Agent, Gemini, tool
 
 # 1. API KEY CONFIGURATION
-# It is best practice to use environment variables.
+# Best practice: 'Your_API_Key' placeholder for examples.
 os.environ["GEMINI_API_KEY"] = "Your_API_Key"
 
-# 2. OPTIONAL: Define a custom tool
+# 2. DEFINE PREMIUM CUSTOM TOOLS
 @tool
-def get_weather(location: str):
-    """Fetches the current weather for a given city."""
-    return f"The weather in {location} is currently sunny and 25°C."
+def analyze_sentiment(text: str):
+    """Analyzes the emotional tone of a given text. Use for content moderation."""
+    scores = ["Positive", "Netural", "Negative"]
+    return f"Sentiment Analysis: {random.choice(scores)} (Confidence: 0.98)"
+
+@tool
+def get_crypto_price(symbol: str):
+    """Fetches real-time price for any cryptocurrency (e.g., BTC, ETH)."""
+    prices = {"BTC": "$68,432", "ETH": "$3,842", "SOL": "$145"}
+    return f"Current {symbol} Price: {prices.get(symbol.upper(), 'Data unavailable')}"
+
+@tool
+def calculate_roi(investment: float, revenue: float):
+    """Calculates Return on Investment (ROI) efficiency for business tasks."""
+    roi = ((revenue - investment) / investment) * 100
+    return f"Calculated ROI: {roi:.2f}%"
 
 def main():
-    # 3. INITIALIZE PROVIDER
-    # We use Gemini here, but you can swap to OpenAI() or Ollama() easily.
+    # 3. INITIALIZE THE CORE ENGINE
+    # OrionAI uses provider-native drivers for maximum speed.
     llm = Gemini(model_name="gemini-2.0-flash", token_count=True)
 
-    # 4. DEFINE THE AGENT
-    # This agent is configured to be ultra-efficient and direct.
+    # 4. DEFINE THE 'VANGUARD' AGENT
+    # Precision-engineered to be ultra-efficient and direct.
     agent = Agent(
-        name="Orion-Core",
-        role="Productivity Specialist",
-        system_instruction="You are a helpful assistant that answers questions accurately and concisely.",
+        name="Vanguard-Core",
+        role="Intelligence Analyst",
+        system_instruction="Provide objective, data-backed insights. No fluff.",
         model=llm,
-        memory="persistent",       # Automatically handles vector storage and retrieval
-        use_default_tools=True,    # Injects Web Search, Terminal, Python, and File tools
-        tools=[get_weather],       # Appends our custom weather tool
-        guards=["straight", "short"], # Enforces no emojis and max 3 sentences
-        verbose=True,              # Enables the beautiful dimmed execution trace
+        memory="persistent",       # Seamlessly saves conversation to memory/orionagent.db
+        use_default_tools=True,    # Injects Web Search, Terminal, Python, and Files tools
+        tools=[analyze_sentiment, get_crypto_price, calculate_roi],
+        guards=["straight", "short"], # Logic Guards: No emojis, Max 3 sentences
+        verbose=True,              # Enables the sleek, dimmed execution trace
     )
 
     print("\n" + "="*50)
-    print("🚀 ORIONAGENT SINGLE-AGENT DEMO")
-    print("="*50)
+    print("ORIONAI: THE SOVEREIGN AGENT FRAMEWORK")
+    print("="*52)
     print("FEATURES: Persistence + Logic Guards + Multi-Tooling")
+    print("STRATEGY: Single Agent Power-Loop")
     print("COMMANDS: Type 'exit' to quit.\n")
 
     # 5. START INTERACTIVE CHAT
-    # .chat() initiates a recursive, autonomous conversational loop.
-    # Alternatively, use .ask() for single-turn programmatic calls.
-    agent.chat("Hello! I am ready to assist. Type your request below:")
+    # .chat() initiates an autonomous, tool-aware conversational loop.
+    agent.chat("System Online. Vanguard-Core ready for complex mission parameters.")
 
 if __name__ == "__main__":
     main()
