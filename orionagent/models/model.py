@@ -36,6 +36,7 @@ class Model:
         model: str = None,
         api_key: str = None,
         base_url: str = None,
+        temperature: float = None,
         streaming: bool = True,
         verbose: bool = False,
         debug: bool = False,
@@ -48,6 +49,8 @@ class Model:
             kwargs["api_key"] = api_key
         if base_url is not None:
             kwargs["base_url"] = base_url
+        if temperature is not None:
+            kwargs["temperature"] = temperature
 
         from orionagent.models.provider_registry import get_provider
         return get_provider(provider, **kwargs)

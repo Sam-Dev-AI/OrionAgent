@@ -19,6 +19,7 @@ class Gemini(ModelProvider):
         self,
         model_name: str = "gemini-2.0-flash",
         api_key: Optional[str] = None,
+        temperature: Optional[float] = None,
         token_count: bool = False,
         streaming: bool = True,
         verbose: bool = False,
@@ -27,6 +28,7 @@ class Gemini(ModelProvider):
         super().__init__(token_count=token_count, streaming=streaming, verbose=verbose, debug=debug)
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         self.model_name = model_name
+        self.temperature = temperature
         
         self.session_input_tokens = 0
         self.session_output_tokens = 0
@@ -98,56 +100,60 @@ class Gemini(ModelProvider):
         tools: Optional[List[Tool]] = None,
     ) -> str:
         """Send *prompt* to Gemini. Intercepts and executes tools automatically."""
-        messages = prompt
-        config = self._build_config(system_instruction, temperature, max_tokens, tools)
-        
-        while True:
-            response = self._client.models.generate_content(
+        config = self._build_config(
+            system_instruction, 
+            temperature if temperature is not None else self.temperature, 
+            max_tokens, 
+            tools
+        )
+
+        response = self._client.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=config,
+        )
+
+        # Accumulate tokens
+        self._print_token_usage(response.usage_metadata)
+
+        # Handle tool calls
+        if response.candidates[0].content.parts[0].function_call:
+            from orionagent.tools.tool_executor import ToolExecutor
+            executor = ToolExecutor()
+            
+            tool_outputs = []
+            for part in response.candidates[0].content.parts:
+                if part.function_call:
+                    name = part.function_call.name
+                    args = part.function_call.args
+                    res = executor.execute(name, args, tools)
+                    tool_outputs.append({
+                        "call_id": None, # Gemini 0.1 doesn't use call_id in simple mode
+                        "name": name,
+                        "output": res
+                    })
+
+            # Send back to model
+            from google.genai import types
+            
+            # Gemini expects the full history for tool results
+            history = [
+                types.Content(role="user", parts=[types.Part(text=prompt)]),
+                response.candidates[0].content,
+                types.Content(role="user", parts=[
+                    types.Part(function_response=types.FunctionResponse(name=o["name"], response={"result": o["output"]})) for o in tool_outputs
+                ])
+            ]
+
+            final_response = self._client.models.generate_content(
                 model=self.model_name,
-                contents=messages,
+                contents=history,
                 config=config,
             )
-            self._print_token_usage(response.usage_metadata)
-            
-            if response.function_calls:
-                from google.genai import types
-                
-                # If first loop, convert string prompt into robust message format
-                if isinstance(messages, str):
-                    messages = [{"role": "user", "parts": [{"text": messages}]}]
-                    
-                messages.append(response.candidates[0].content) # Add model turn
-                
-                # Parallel tool execution
-                from orionagent.tools.tool_executor import ToolExecutor
-                executor = ToolExecutor()
-                
-                calls = []
-                for fc in response.function_calls:
-                    args_str = json.dumps(fc.args) if isinstance(fc.args, dict) else str(fc.args)
-                    calls.append({"name": fc.name, "args": args_str})
-                
-                from orionagent.tracing import tracer
-                for c in calls:
-                    tracer.log_event("tool", f"Executing {c['name']}", c['args'], verbose=self.verbose, debug=self.debug)
-                
-                results = executor.execute_many(calls, tools)
-                
-                tool_results = []
-                for res in results:
-                    tool_results.append(
-                        types.Part.from_function_response(
-                            name=res["name"],
-                            response={"result": res["result"]}
-                        )
-                    )
-                messages.append({"role": "user", "parts": tool_results})
-            else:
-                return response.text
+            self._print_token_usage(final_response.usage_metadata)
+            return final_response.text
 
-    # ------------------------------------------------------------------
-    # Streaming generation
-    # ------------------------------------------------------------------
+        return response.text
 
     def generate_stream(
         self,
@@ -157,77 +163,58 @@ class Gemini(ModelProvider):
         max_tokens: Optional[int] = None,
         tools: Optional[List[Tool]] = None,
     ) -> Generator[str, None, None]:
-        """Stream response chunks from Gemini in real-time, handling tools automatically."""
-        messages = prompt
-        config = self._build_config(system_instruction, temperature, max_tokens, tools)
-        
-        while True:
-            # If we have tools, we must be careful. Gemini's stream API 
-            # will return function_calls in chunks if they are present.
-            
-            stream = self._client.models.generate_content_stream(
-                model=self.model_name,
-                contents=messages,
-                config=config,
-            )
-            
-            first_chunk = next(stream, None)
-            if not first_chunk:
-                return
+        """Yield chunks from Gemini. Intercepts and executes tools automatically."""
+        config = self._build_config(
+            system_instruction, 
+            temperature if temperature is not None else self.temperature, 
+            max_tokens, 
+            tools
+        )
 
-            # Accumulate tool calls if present in the first part of the stream
-            if first_chunk.function_calls:
-                # If it's a tool call, we consume the rest of the stream 
-                # (usually tool calls come in the first chunk or two)
-                full_response = first_chunk
-                for chunk in stream:
-                    # In practice, Gemini tool calls are usually in one chunk, 
-                    # but we should handle accumulation if needed.
-                    pass 
-                
-                from google.genai import types
-                if isinstance(messages, str):
-                    messages = [{"role": "user", "parts": [{"text": messages}]}]
-                
-                messages.append(full_response.candidates[0].content)
+        stream = self._client.models.generate_content_stream(
+            model=self.model_name,
+            contents=prompt,
+            config=config,
+        )
 
-                # Parallel tool execution preparation
-                calls = []
-                for fc in full_response.function_calls:
-                    args_str = json.dumps(fc.args) if isinstance(fc.args, dict) else str(fc.args)
-                    calls.append({"name": fc.name, "args": args_str})
-
-                from orionagent.tracing import tracer
-                for c in calls:
-                    tracer.log_event("tool", f"Executing {c['name']}", c['args'], verbose=self.verbose, debug=self.debug)
+        full_content = []
+        for chunk in stream:
+            # We must check for function calls in the first chunk or combined chunks
+            # In Gemini, if it's a tool call, it's usually the whole chunk.
+            if chunk.candidates[0].content.parts[0].function_call:
+                # Tool call detected in stream.
+                # Logic: collect all chunks, execute, then re-call generate
+                # But typically Gemini tool calls are non-streaming in the functional part.
+                # For simplicity, if we detect a tool call, we stop streaming and handle as full.
+                # Gemini tool calls in stream usually contain the whole call in one candidate.
                 
                 from orionagent.tools.tool_executor import ToolExecutor
                 executor = ToolExecutor()
-                results = executor.execute_many(calls, tools)
                 
-                tool_results = []
-                for res in results:
-                    tool_results.append(
-                        types.Part.from_function_response(
-                            name=res["name"],
-                            response={"result": res["result"]}
-                        )
-                    )
-                messages.append({"role": "user", "parts": tool_results})
-                # Loop continues to get the model's response to tool results
-                continue
-                
-            else:
-                # It's a text response, yield the first chunk and then the rest
-                if first_chunk.text:
-                    yield first_chunk.text
-                
-                final_usage = first_chunk.usage_metadata
-                for chunk in stream:
-                    if chunk.usage_metadata:
-                        final_usage = chunk.usage_metadata
-                    if chunk.text:
-                        yield chunk.text
-                
-                self._print_token_usage(final_usage)
+                tool_outputs = []
+                for part in chunk.candidates[0].content.parts:
+                    if part.function_call:
+                        res = executor.execute(part.function_call.name, part.function_call.args, tools)
+                        tool_outputs.append({"name": part.function_call.name, "output": res})
+
+                from google.genai import types
+                history = [
+                    types.Content(role="user", parts=[types.Part(text=prompt)]),
+                    chunk.candidates[0].content,
+                    types.Content(role="user", parts=[
+                        types.Part(function_response=types.FunctionResponse(name=o["name"], response={"result": o["output"]})) for o in tool_outputs
+                    ])
+                ]
+
+                final_stream = self._client.models.generate_content_stream(
+                    model=self.model_name,
+                    contents=history,
+                    config=config,
+                )
+                for final_chunk in final_stream:
+                    if final_chunk.text:
+                        yield final_chunk.text
                 return
+
+            if chunk.text:
+                yield chunk.text

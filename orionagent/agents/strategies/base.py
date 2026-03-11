@@ -18,9 +18,9 @@ class BaseStrategy:
     """
 
     def _stream_response(
-        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True
+        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True, temperature: Optional[float] = None
     ) -> Generator[str, None, None]:
-        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace)
+        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace, temperature=temperature)
 
     def execute(
         self,

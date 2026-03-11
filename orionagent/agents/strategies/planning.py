@@ -66,8 +66,8 @@ class PlanningStrategy(BaseStrategy):
         tracer.end_trace(trace_id, f"Plan created: {len(plan)} steps")
 
         if stream:
-            return self._stream_plan(plan, agents, task, model, async_mode)
-        return self._execute_plan_full(plan, agents, task, model, async_mode)
+            return self._stream_plan(plan, agents, task, model, async_mode, temperature=temperature)
+        return self._execute_plan_full(plan, agents, task, model, async_mode, temperature=temperature)
 
     # ------------------------------------------------------------------
     # Plan creation
@@ -133,7 +133,7 @@ class PlanningStrategy(BaseStrategy):
         return agents[0]
 
     def _execute_plan_full(
-        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True
+        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, temperature: Optional[float] = None
     ) -> str:
         """Execute all plan steps and return ONLY the final result."""
         import concurrent.futures
@@ -150,7 +150,7 @@ class PlanningStrategy(BaseStrategy):
                     instruction = step.get("s", step.get("step", original_task))
                     agent = self._find_agent(step.get("a", step.get("agent")), agents)
                     prompt = f"Previous result: {last_result}\n\nTask: {instruction}" if last_result else instruction
-                    last_result = agent.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=False)
+                    last_result = agent.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature)
             else:
                 # Parallel group
                 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -159,7 +159,7 @@ class PlanningStrategy(BaseStrategy):
                         instruction = step.get("s", step.get("step", original_task))
                         agent = self._find_agent(step.get("a", step.get("agent")), agents)
                         prompt = f"Previous result: {last_result}\n\nTask: {instruction}" if last_result else instruction
-                        futures.append(executor.submit(agent.ask, prompt, False, False, None, False, False)) # instruction, stream, use_strategy, session_id, record_memory, record_trace
+                        futures.append(executor.submit(agent.ask, prompt, False, False, None, False, False, None, temperature)) # task, stream, use_strategy, session_id, record_memory, record_trace, priority, temperature
                     
                     results = [f.result() for f in concurrent.futures.as_completed(futures)]
                     last_result = "\n".join(results)
@@ -167,7 +167,7 @@ class PlanningStrategy(BaseStrategy):
         return last_result
 
     def _stream_plan(
-        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True
+        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, temperature: Optional[float] = None
     ) -> Generator[str, None, None]:
         """Stream plan execution, yielding ONLY the final step's result."""
         import concurrent.futures
@@ -188,9 +188,9 @@ class PlanningStrategy(BaseStrategy):
                     is_final_step = is_final_group and (step_idx == len(group) - 1)
                     
                     if is_final_step:
-                        yield from agent.ask(prompt, stream=True, use_strategy=False, record_memory=False, record_trace=False)
+                        yield from agent.ask(prompt, stream=True, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature)
                     else:
-                        last_result = agent.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=False)
+                        last_result = agent.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature)
             else:
                 # Parallel group execution
                 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -199,7 +199,7 @@ class PlanningStrategy(BaseStrategy):
                         instruction = step.get("s", step.get("step", original_task))
                         agent = self._find_agent(step.get("a", step.get("agent")), agents)
                         prompt = f"Previous result: {last_result}\n\nTask: {instruction}" if last_result else instruction
-                        futures.append(executor.submit(agent.ask, prompt, False, False, None, False, False))
+                        futures.append(executor.submit(agent.ask, prompt, False, False, None, False, False, None, temperature))
                     
                     results = [f.result() for f in concurrent.futures.as_completed(futures)]
                     last_result = "\n".join(results)

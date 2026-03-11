@@ -142,6 +142,7 @@ class Agent:
         record_memory: bool = True,
         record_trace: bool = True,
         priority: Optional[str] = None,
+        temperature: Optional[float] = None,
     ) -> Union[str, Generator[str, None, None]]:
         """Execute a task."""
         from orionagent.tracing import tracer
@@ -173,7 +174,7 @@ class Agent:
                 agents=[self],
                 model=self.model,
                 system_instruction=self.system_instruction,
-                temperature=None,
+                temperature=temperature,
                 tools=self.tools,
                 stream=stream,
                 async_mode=self.async_mode,
@@ -214,7 +215,7 @@ class Agent:
             # For streaming, we wrap the generator to end the trace
             def _trace_generator():
                 full_res = []
-                for chunk in self._ask_stream(prompt, session):
+                for chunk in self._ask_stream(prompt, session, temperature=temperature):
                     full_res.append(chunk)
                     yield chunk
                 res_str = "".join(full_res)
@@ -226,7 +227,7 @@ class Agent:
                     tracer.print_summary()
             return _trace_generator()
 
-        res = self._ask_full(prompt, session)
+        res = self._ask_full(prompt, session, temperature=temperature)
         if self.memory_config.mode != "none" and record_memory:
             self._memory_pipeline.process_turn(session, "assistant", res, self.model)
         if trace_id:
@@ -237,10 +238,10 @@ class Agent:
             
         return res
 
-    def chat(self, greeting: str = None, session_id: Optional[str] = None, priority: Optional[str] = None):
+    def chat(self, greeting: str = None, session_id: Optional[str] = None, priority: Optional[str] = None, temperature: Optional[float] = None):
         """Starts an interactive chat session with this agent."""
         from orionagent.chat import chat
-        return chat(self, greeting=greeting, session_id=session_id, priority=priority)
+        return chat(self, greeting=greeting, session_id=session_id, priority=priority, temperature=temperature)
 
     # ------------------------------------------------------------------
     # Tool access
@@ -258,11 +259,12 @@ class Agent:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _ask_full(self, prompt: str, session: Session) -> str:
+    def _ask_full(self, prompt: str, session: Session, temperature: Optional[float] = None) -> str:
         if self.model:
             response = self.model.generate(
                 prompt=prompt,
                 system_instruction=self.system_instruction,
+                temperature=temperature,
                 tools=self.tools if self.tools else None,
             )
             # Log agent's response to memory only if we are the leaf execution
@@ -273,12 +275,13 @@ class Agent:
 
         return f"{self.name} processing task: {prompt}"
 
-    def _ask_stream(self, prompt: str, session: Session) -> Generator[str, None, None]:
+    def _ask_stream(self, prompt: str, session: Session, temperature: Optional[float] = None) -> Generator[str, None, None]:
         if self.model:
             full_response = []
             for chunk in self.model.generate_stream(
                 prompt=prompt,
                 system_instruction=self.system_instruction,
+                temperature=temperature,
                 tools=self.tools if self.tools else None,
             ):
                 full_response.append(chunk)

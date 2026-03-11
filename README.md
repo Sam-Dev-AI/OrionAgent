@@ -67,6 +67,7 @@ agent = Agent(
     use_default_tools=True,      # Integrated Web, File, and OS tools
     tools=[crypto_ticker],
     guards=["straight", "short"], # Deterministic Output Validation
+    temperature=0.7,             # Model Creativity Control
     verbose=True                 # Premium Dimmed Trace Logs
 )
 
@@ -101,7 +102,8 @@ writer = Agent(
 manager = Manager(
     model=llm,
     agents=[researcher, writer],
-    strategy=["planning", "self_learn"] # Plan -> Execute -> Evaluate -> Correct
+    strategy=["planning", "self_learn"], # Plan -> Execute -> Evaluate -> Correct
+    temperature=0.3                      # Global override for orchestration
 )
 
 manager.chat("Draft a technical report on 2024 industrial AI trends.")
@@ -169,15 +171,19 @@ manager = Manager(
 OrionAgent is engineered for zero-latency. Control core performance variables directly:
 
 ```python
-# 1. Enable token usage tracking on the model level
-llm = Gemini(model_name="gemini-2.0-flash", token_count=True)
+# 1. Enable token usage tracking and set default temperature
+llm = Gemini(model_name="gemini-2.0-flash", token_count=True, temperature=0.7)
 
 # 2. Control execution speed and streaming
 agent = Agent(
     model=llm,
     async_mode=True, # Enable parallel tool calls & strategy steps
+    temperature=0.3, # Override model default for this specific agent
     debug=True       # Real-time 'Industrial' reasoning logs
 )
+
+# 3. Request-level override
+agent.ask("What is the speed of light?", temperature=0.0)
 ```
 
 - **`token_count=True`**: Tracks input/output tokens for precise cost monitoring.

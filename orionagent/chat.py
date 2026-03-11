@@ -22,6 +22,7 @@ def chat(
     greeting: str = None,
     session_id: Optional[str] = None,
     priority: Optional[str] = None,
+    temperature: Optional[float] = None,
 ) -> None:
     """Start an interactive chat loop with an Agent or Manager.
 
@@ -30,6 +31,7 @@ def chat(
         greeting: Optional greeting to display at startup.
         session_id: Optional session ID.
         priority: Optional session priority ('low', 'normal', 'high').
+        temperature: Optional model temperature override.
     """
     name = getattr(target, "name", "OrionAI")
 
@@ -51,8 +53,14 @@ def chat(
                 print("Goodbye!")
                 break
 
-            print(f"\n{name}:", end=" ")
-            for chunk in target.ask(task, stream=True, session_id=session_id, priority=priority):
+            # Call target.ask with streaming
+            for chunk in target.ask(
+                task, 
+                stream=True, 
+                session_id=session_id, 
+                priority=priority,
+                temperature=temperature
+            ):
                 print(chunk, end="", flush=True)
             print("\n")
 

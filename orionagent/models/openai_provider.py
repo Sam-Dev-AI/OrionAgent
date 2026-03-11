@@ -1,7 +1,4 @@
 """OpenAI provider for OrionAI.
-
-system_instruction is sent as the "system" role message -- the
-standard OpenAI mechanism which keeps it separate from user messages.
 """
 
 import os
@@ -10,6 +7,7 @@ from typing import Any, Generator, Optional, List
 from orionagent.models.base_provider import ModelProvider
 from orionagent.tools.base_tool import Tool
 
+
 class OpenAI(ModelProvider):
     """LLM provider backed by OpenAI (GPT models)."""
 
@@ -17,6 +15,7 @@ class OpenAI(ModelProvider):
         self,
         model_name: str = "gpt-4o-mini",
         api_key: Optional[str] = None,
+        temperature: Optional[float] = None,
         token_count: bool = False,
         streaming: bool = True,
         verbose: bool = False,
@@ -25,6 +24,7 @@ class OpenAI(ModelProvider):
         super().__init__(token_count=token_count, streaming=streaming, verbose=verbose, debug=debug)
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self.model_name = model_name
+        self.temperature = temperature
 
         self.session_input_tokens = 0
         self.session_output_tokens = 0
@@ -59,10 +59,6 @@ class OpenAI(ModelProvider):
         self.session_output_tokens += (usage.completion_tokens or 0)
         self.session_total_tokens += (usage.total_tokens or 0)
 
-    # ------------------------------------------------------------------
-    # Standard generation
-    # ------------------------------------------------------------------
-
     def generate(
         self,
         prompt: str,
@@ -72,55 +68,73 @@ class OpenAI(ModelProvider):
         tools: Optional[List[Tool]] = None,
     ) -> str:
         """Send *prompt* to OpenAI. Intercepts and executes tools automatically."""
-        messages = self._build_messages(prompt, system_instruction)
+        messages = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({"role": "user", "content": prompt})
+
+        formatted_tools = None
+        if tools:
+            formatted_tools = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    },
+                }
+                for t in tools
+            ]
+
+        temp = temperature if temperature is not None else self.temperature
         
-        while True:
-            kwargs = self._build_kwargs(temperature, max_tokens)
-            if tools:
-                kwargs["tools"] = [
-                    {
-                        "type": "function", 
-                        "function": {"name": t.name, "description": t.description, "parameters": t.parameters}
-                    } for t in tools
-                ]
-                kwargs["tool_choice"] = "auto"
+        kwargs = {
+            "model": self.model_name,
+            "messages": messages,
+        }
+        if temp is not None:
+            kwargs["temperature"] = temp
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        if formatted_tools:
+            kwargs["tools"] = formatted_tools
+
+        response = self._client.chat.completions.create(**kwargs)
+
+        # Accumulate tokens
+        if hasattr(response, "usage"):
+            self._print_token_usage(response.usage)
+
+        message = response.choices[0].message
+        if message.tool_calls:
+            from orionagent.tools.tool_executor import ToolExecutor
+            executor = ToolExecutor()
+            
+            messages.append(message) # Add assistant tool call message to history
+            
+            for tool_call in message.tool_calls:
+                name = tool_call.function.name
+                args = json.loads(tool_call.function.arguments)
+                res = executor.execute(name, args, tools)
                 
-            response = self._client.chat.completions.create(
+                messages.append({
+                    "tool_call_id": tool_call.id,
+                    "role": "tool",
+                    "name": name,
+                    "content": res,
+                })
+
+            # Final call with tool results
+            final_response = self._client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
-                **kwargs,
             )
-            self._print_token_usage(response.usage)
-            choice = response.choices[0]
-            
-            if choice.message.tool_calls:
-                messages.append(choice.message) # Keep assistant's tool call records
-                for tc in choice.message.tool_calls:
-                    target = next((t for t in tools if t.name == tc.function.name), None)
-                    if target:
-                        from orionagent.tracing import tracer
-                        tracer.log_event("tool", f"Executing {tc.function.name}", tc.function.arguments, verbose=self.verbose, debug=self.debug)
-                        try:
-                            # Pass raw JSON string directly to tool.run()
-                            res = target.run(tc.function.arguments)
-                        except Exception as e:
-                            res = f"Error: {e}"
-                    else:
-                        res = f"Unknown tool: {tc.function.name}"
-                        
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "name": tc.function.name,
-                        "content": str(res)
-                    })
-                # Loop repeats with tool outputs appended to messages!
-            else:
-                return choice.message.content
+            if hasattr(final_response, "usage"):
+                self._print_token_usage(final_response.usage)
+            return final_response.choices[0].message.content
 
-    # ------------------------------------------------------------------
-    # Streaming generation
-    # ------------------------------------------------------------------
+        return message.content
 
     def generate_stream(
         self,
@@ -130,125 +144,97 @@ class OpenAI(ModelProvider):
         max_tokens: Optional[int] = None,
         tools: Optional[List[Tool]] = None,
     ) -> Generator[str, None, None]:
-        """Stream response chunks from OpenAI in real-time, handling tools automatically."""
-        messages = self._build_messages(prompt, system_instruction)
-        
-        while True:
-            stream_kwargs = self._build_kwargs(temperature, max_tokens)
-            stream_kwargs["stream_options"] = {"include_usage": True}
-            if tools:
-                stream_kwargs["tools"] = [
-                    {
-                        "type": "function", 
-                        "function": {"name": t.name, "description": t.description, "parameters": t.parameters}
-                    } for t in tools
-                ]
-                stream_kwargs["tool_choice"] = "auto"
-
-            stream = self._client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                stream=True,
-                **stream_kwargs,
-            )
-            
-            # We need to detect if it's a tool call or text. 
-            # OpenAI sometimes sends tool_calls in chunks.
-            
-            full_tool_calls_raw = {} # id -> {name, arguments}
-            text_started = False
-            final_usage = None
-            
-            for chunk in stream:
-                if chunk.usage:
-                    final_usage = chunk.usage
-                
-                if not chunk.choices:
-                    continue
-                
-                delta = chunk.choices[0].delta
-                
-                # Check for tool calls
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        if tc.id:
-                            full_tool_calls_raw[tc.index] = {
-                                "id": tc.id,
-                                "name": tc.function.name,
-                                "arguments": tc.function.arguments or ""
-                            }
-                        else:
-                            full_tool_calls_raw[tc.index]["arguments"] += tc.function.arguments or ""
-                
-                # Check for text
-                if delta.content:
-                    text_started = True
-                    yield delta.content
-            
-            if full_tool_calls_raw:
-                # Handle tool calls
-                # Reconstruct choice.message for internal state
-                # (OpenAI client usually wants the full message object)
-                # But for simplicity, we'll build a messages update
-                
-                # First, add the assistant's message with tool calls
-                tool_calls_list = []
-                for index in sorted(full_tool_calls_raw.keys()):
-                    tc = full_tool_calls_raw[index]
-                    tool_calls_list.append({
-                        "id": tc["id"],
-                        "type": "function",
-                        "function": {"name": tc["name"], "arguments": tc["arguments"]}
-                    })
-                
-                messages.append({"role": "assistant", "tool_calls": tool_calls_list})
-                
-                for tc_data in tool_calls_list:
-                    tc_id = tc_data["id"]
-                    tc_func = tc_data["function"]
-                    
-                    from orionagent.tracing import tracer
-                    tracer.log_event("tool", f"Executing {tc_func['name']}", tc_func["arguments"], verbose=self.verbose, debug=self.debug)
-                    
-                    target = next((t for t in tools if t.name == tc_func["name"]), None)
-                    if target:
-                        try:
-                            res = target.run(tc_func["arguments"])
-                        except Exception as e:
-                            res = f"Error: {e}"
-                    else:
-                        res = f"Unknown tool: {tc_func['name']}"
-                    
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc_id,
-                        "name": tc_func["name"],
-                        "content": str(res)
-                    })
-                # Loop continues
-                continue
-            
-            self._print_token_usage(final_usage)
-            return
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _build_messages(prompt: str, system_instruction: Optional[str]) -> list:
-        """Build the messages list with an optional system role message."""
+        """Yield chunks from OpenAI. Intercepts and executes tools automatically."""
         messages = []
         if system_instruction:
             messages.append({"role": "system", "content": system_instruction})
         messages.append({"role": "user", "content": prompt})
-        return messages
 
-    @staticmethod
-    def _build_kwargs(temperature, max_tokens) -> dict:
-        kwargs = {}
-        if temperature is not None:
-            kwargs["temperature"] = temperature
+        formatted_tools = None
+        if tools:
+            formatted_tools = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    },
+                }
+                for t in tools
+            ]
+
+        temp = temperature if temperature is not None else self.temperature
+
+        kwargs = {
+            "model": self.model_name,
+            "messages": messages,
+            "stream": True,
+        }
+        if temp is not None:
+            kwargs["temperature"] = temp
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
-        return kwargs
+        if formatted_tools:
+            kwargs["tools"] = formatted_tools
+
+        stream = self._client.chat.completions.create(**kwargs)
+
+        full_tool_calls = {} # tool_call_id -> {name, args, type}
+        
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    if tc.id:
+                        full_tool_calls[tc.index] = {
+                            "id": tc.id,
+                            "name": tc.function.name,
+                            "args": tc.function.arguments or ""
+                        }
+                    else:
+                        full_tool_calls[tc.index]["args"] += (tc.function.arguments or "")
+            
+            if delta.content:
+                yield delta.content
+
+        if full_tool_calls:
+            # End of stream, but we have tool calls to execute
+            from orionagent.tools.tool_executor import ToolExecutor
+            executor = ToolExecutor()
+            
+            # Prepare assistant message for history
+            tool_calls_payload = []
+            for idx in sorted(full_tool_calls.keys()):
+                tc = full_tool_calls[idx]
+                tool_calls_payload.append({
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {"name": tc["name"], "arguments": tc["args"]}
+                })
+            
+            messages.append({"role": "assistant", "tool_calls": tool_calls_payload})
+
+            for idx in sorted(full_tool_calls.keys()):
+                tc = full_tool_calls[idx]
+                name = tc["name"]
+                args = json.loads(tc["args"])
+                res = executor.execute(name, args, tools)
+                
+                messages.append({
+                    "tool_call_id": tc["id"],
+                    "role": "tool",
+                    "name": name,
+                    "content": res,
+                })
+
+            # Re-call generate_stream for final response
+            final_stream = self._client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                stream=True
+            )
+            for final_chunk in final_stream:
+                if final_chunk.choices[0].delta.content:
+                    yield final_chunk.choices[0].delta.content

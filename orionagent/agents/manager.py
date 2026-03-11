@@ -162,6 +162,7 @@ class Manager:
         session_id: Optional[str] = None,
         record_memory: bool = True,
         record_trace: bool = True,
+        temperature: Optional[float] = None,
     ) -> Union[str, Generator[str, None, None]]:
         """Orchestrate a task across multiple agents."""
         from orionagent.tracing import tracer
@@ -204,7 +205,7 @@ class Manager:
             model=self._model,
             system_instruction=enriched_instruction,
             context=context,
-            temperature=self.temperature,
+            temperature=temperature if temperature is not None else self.temperature,
             tools=self.tools,
             stream=stream,
             async_mode=self.async_mode,
@@ -250,7 +251,7 @@ class Manager:
             if self.verbose and record_trace:
                 tracer.print_summary()
             return result
-    def chat(self, greeting: str = None, session_id: Optional[str] = None):
+    def chat(self, greeting: str = None, session_id: Optional[str] = None, temperature: Optional[float] = None):
         """Starts an interactive chat session with the manager."""
         from orionagent.chat import chat
-        return chat(self, greeting=greeting, session_id=session_id)
+        return chat(self, greeting=greeting, session_id=session_id, temperature=temperature)

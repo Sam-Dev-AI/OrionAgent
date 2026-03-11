@@ -56,9 +56,9 @@ class DirectStrategy(BaseStrategy):
                 selected = agents[0]
 
         if stream:
-            return self._stream_response(selected, prompt, model, record_trace=record_trace)
+            return self._stream_response(selected, prompt, model, record_trace=record_trace, temperature=temperature)
         
-        result = selected.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=record_trace)
+        result = selected.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=record_trace, temperature=temperature)
         return result
 
     @staticmethod
@@ -73,6 +73,6 @@ class DirectStrategy(BaseStrategy):
         )
 
     def _stream_response(
-        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True
+        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True, temperature: float = None
     ) -> Generator[str, None, None]:
-        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace)
+        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace, temperature=temperature)
