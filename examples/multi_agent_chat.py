@@ -49,7 +49,7 @@ def main():
     manager = Manager(
         name="Orion-Supreme",
         model=llm,
-    # 🛡️ ADVANCED: Combined Strategy
+    # ADVANCED: Combined Strategy
         # 'planning'   -> Decomposes the task into a logical roadmap.
         # 'self_learn' -> Quality control. If an agent fails the 'verdict', Manager re-delegates.
         strategy=["planning", "self_learn"], 

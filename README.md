@@ -74,14 +74,14 @@ manager.chat("Draft a technical report on 2024 industrial AI trends.")
 
 OrionAI utilizes a declarative configuration system to ensure industrial-grade reliability.
 
-### 🛡️ Logic & Guardrails
+### Logic & Guardrails
 | Parameter | Description | Supported Built-ins |
 | :--- | :--- | :--- |
 | `guards` | Deterministic output filters. | `json`, `straight`, `short`, `long`, `polite` |
 | `verbose` | Real-time orchestration tracing. | `True` (Recommended for Dev), `False` |
 | `max_refinements` | Self-Learn retry threshold. | Default: `2` (Never infinite loops) |
 
-### 💾 Memory & State
+### Memory & State
 | Parameter | Description | Storage Type |
 | :--- | :--- | :--- |
 | `none` | Transient execution. | No Storage |
