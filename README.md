@@ -110,28 +110,36 @@ manager.chat("Draft a technical report on 2024 industrial AI trends.")
 
 ---
 
-## Core Configuration & API Reference
+## Core Configuration & Architecture
 
-OrionAgent utilizes a declarative configuration system to ensure industrial-grade reliability.
+OrionAgent utilizes a granular, declarative configuration system built for industrial-scale reliability. Below is a deep dive into the core execution variables that power the framework.
 
-### Logic & Guardrails
-| Parameter | Description | Supported Built-ins |
-| :--- | :--- | :--- |
-| `guards` | Deterministic output filters. | `json`, `straight`, `short`, `long`, `polite` |
-| `verbose` | Real-time orchestration tracing. | `True` (Recommended for Dev), `False` |
-| `max_refinements` | Self-Learn retry threshold. | Default: `2` (Never infinite loops) |
+### 1. Deterministic Logic Guardrails
+Guardrails act as a real-time auditor for agent outputs, ensuring every response adheres to mission-critical constraints.
+- **`guards`**: A list of filters applied to the agent's response.
+    - **`json`**: Forces the output into a valid JSON schema.
+    - **`straight`**: Removes conversational filler and "fluff" for practical excellence.
+    - **`polite`**: Ensures professional and courteous communication.
+    - **`short` / `long`**: Controls output density for specific UI or bandwidth requirements.
+- **`max_refinements`**: The maximum number of self-correction loops allowed. This prevents infinite loops while guaranteeing high-quality output (Default: `2`).
 
-### Memory & State
-| Parameter | Description | Storage Type |
-| :--- | :--- | :--- |
-| `none` | Transient execution. | No Storage |
-| `session` | Short-term context retention. | RAM / JSON |
-| `persistent` | Vector-summarized knowledge. | SQLite Knowledge Base |
+### 2. Multi-Tier Memory Systems
+Persistence is a first-class citizen in OrionAgent. You can choose the persistence tier that fits your mission's longevity requirements.
+- **`none`**: (Transient) No data is stored between turns. Ideal for privacy-first or stateless utility calls.
+- **`session`**: (Short-Term) Retains raw conversation history in a structured sliding window for immediate precision.
+- **`persistent`**: (Long-Term) Automatically distills and stores facts into a **Hierarchical SQLite** database, creating a growing knowledge base for the agent.
 
-### Strategic Orchestration
-*   **Planning**: Decomposes complex goals into parallelizable task arrays.
-*   **Self-Learn**: Dynamically evaluates agent quality and re-delegates on failure (The **Verdict** Loop).
-*   **@tool**: Decorator for seamless Python function-to-tool conversion.
+### 3. Strategic Orchestration (`strategy`)
+The `Manager` employs recursive strategy loops to decompose and execute complex goals:
+- **`planning`**: Decomposes a high-level goal into a deterministic array of parallelizable tasks, creating a clear execution roadmap.
+- **`self_learn`**: The **Orion Verdict Loop**. If an agent produces an inadequate result or fails a guard, the Manager dynamically evaluates the failure and re-delegates with corrected context.
+
+### 4. Performance & Token Optimization
+OrionAgent is engineered for extreme efficiency, significantly reducing the "abstraction tax" of traditional frameworks:
+- **System-Level Persistence**: Utilizes native provider-side instructions (Gemini GenerateConfig, OpenAI System Role) to bake personas into the model's base state, verified to **reduce token usage by 30%**.
+- **Autonomous Context Pruning**: Real-time monitoring of token counts, dynamically removing redundant history turns during long-running interactions.
+- **Handoff Protocols**: Direct agent-to-agent delegation via `trigger_handoff()` to minimize Manager overhead for low-level tasks.
+
 
 ---
 
@@ -184,13 +192,8 @@ graph TD
 
 ---
 
-## Performance & Token Optimization
-
-1.  **System-Level Persistence**: Native provider-side instructions (Gemini GenerateConfig, OpenAI System Role). Verified **30% reduction** in tokens-per-turn.
-2.  **Autonomous Context Pruning**: Dynamically removes redundant history turns during long-running missions.
-3.  **Handoff Protocols**: Direct agent-to-agent delegation via `trigger_handoff()` to minimize Manager overhead.
-
 ---
+
 
 ## Framework Comparison
 
