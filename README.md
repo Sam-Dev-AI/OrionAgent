@@ -1,4 +1,4 @@
-# OrionAI
+# OrionAgent
 ### The Sovereign Multi-Agent Orchestration Framework
 
 <div align="center">
@@ -8,15 +8,15 @@
 <br />
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue?style=for-the-badge&logo=python&logoColor=white)
-![Gemini](https://img.shields.io/badge/Gemini-2.0--Flash-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white)
+![LLM](https://img.shields.io/badge/LLM-Multi--Provider-8E75B2?style=for-the-badge&logo=openai&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-Persistence-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
 <br />
 
-**OrionAI is built for performance. It eliminates the abstraction tax of modern agent frameworks, providing a low-latency, high-control environment for mission-critical AI applications.**
+**OrionAgent is built for performance. It eliminates the abstraction tax of modern agent frameworks, providing a low-latency, high-control environment for mission-critical AI applications.**
 
-[Quick Start](#quick-start) &nbsp;&bull;&nbsp; [Core Configuration](#core-configuration--api-reference) &nbsp;&bull;&nbsp; [Architecture](#architecture-blueprints) &nbsp;&bull;&nbsp; [Memory Tier](#memory-architecture--patterns) &nbsp;&bull;&nbsp; [OrionAI vs Others](#orionagent-vs-langchain--autogen)
+[Quick Start](#quick-start) &nbsp;&bull;&nbsp; [Core Configuration](#core-configuration--api-reference) &nbsp;&bull;&nbsp; [Architecture](#architecture-blueprints) &nbsp;&bull;&nbsp; [Memory Tier](#memory-architecture--patterns) &nbsp;&bull;&nbsp; [OrionAgent vs Others](#orionagent-vs-langchain--autogen)
 
 ---
 
@@ -24,7 +24,7 @@
 
 ## Overview
 
-**OrionAI** is a cutting-edge multi-agent orchestration framework designed to democratize professional-grade agentic workflows. Powered by the **Orion Engine**—a smart conversational core fusing **Generative AI (Gemini 2.0)** with **Deterministic Logic Guards**—OrionAI offers real-time, actionable task execution for industrial-scale projects.
+**OrionAgent** is a cutting-edge multi-agent orchestration framework designed to democratize professional-grade agentic workflows. Powered by the **Orion Engine**—a smart conversational core fusing **Generative AI (Gemini 2.0)** with **Deterministic Logic Guards**—OrionAgent offers real-time, actionable task execution for industrial-scale projects.
 
 Whether you are building complex research swarms or precision-driven automation pipelines, the **Orion Agent** acts as your 24/7 technical companion, ensuring every output is validated, persistent, and token-efficient.
 
@@ -32,7 +32,7 @@ Whether you are building complex research swarms or precision-driven automation 
 
 ## Philosophy
 
-OrionAI is designed to eliminate the **black box** complexity of modern agent frameworks. It provides a low-abstraction, high-control environment for building agents that are **token-efficient**, **persistent by default**, and **deterministic** via logic guards.
+OrionAgent is designed to eliminate the **black box** complexity of modern agent frameworks. It provides a low-abstraction, high-control environment for building agents that are **token-efficient**, **persistent by default**, and **deterministic** via logic guards.
 
 ---
 
@@ -85,7 +85,7 @@ manager.chat("Draft a technical report on 2024 industrial AI trends.")
 
 ## Core Configuration & API Reference
 
-OrionAI utilizes a declarative configuration system to ensure industrial-grade reliability.
+OrionAgent utilizes a declarative configuration system to ensure industrial-grade reliability.
 
 ### Logic & Guardrails
 | Parameter | Description | Supported Built-ins |
@@ -137,7 +137,7 @@ Decoupled execution architecture for zero-latency orchestration.
 
 ## Memory Architecture & Patterns
 
-Managed through a **Dual-Tier Synchronizer**, OrionAI maintains state across thousands of interactions without context saturation.
+Managed through a **Dual-Tier Synchronizer**, OrionAgent maintains state across thousands of interactions without context saturation.
 
 ### Data Synchronization Flow
 ```mermaid
@@ -167,7 +167,7 @@ graph TD
 
 ## Framework Comparison
 
-| Metric | OrionAI | LangChain | AutoGen |
+| Metric | OrionAgent | LangChain | AutoGen |
 | :--- | :--- | :--- | :--- |
 | **Abstraction** | **Minimalist** | Heavy | Moderate |
 | **Logic Control** | **Deterministic Guards** | Custom Parsers | Limited |
@@ -178,7 +178,7 @@ graph TD
 
 ## Contributing & Community
 
-OrionAI is an open ecosystem. We value contributions that maintain the framework's minimalistic core.
+OrionAgent is an open ecosystem. We value contributions that maintain the framework's minimalistic core.
 
 *   **Reporting Bugs**: Use the GitHub Issue Tracker.
 *   **Feature Requests**: Open a Discussion thread for architectural review.
@@ -188,7 +188,7 @@ OrionAI is an open ecosystem. We value contributions that maintain the framework
 
 ## Support & Roadmap
 
-If you find OrionAI valuable, consider starring the repository to support its development.
+If you find OrionAgent valuable, consider starring the repository to support its development.
 
 *   **Vitals Dashboard**: Real-time telemetry Web UI.
 *   **Human-in-the-Loop**: Interactive approval gates for critical tool calls.
@@ -202,7 +202,7 @@ If you find OrionAI valuable, consider starring the repository to support its de
 
 Released under the **MIT License**. Created by [Samir Lade](mailto:ladesamir10@gmail.com).
 
-**OrionAI: Build Agents That Actually Work.**
+**OrionAgent: Build Agents That Actually Work.**
 
 [GitHub](https://github.com/Sam-Dev-AI/OrionAgent) &nbsp;&bull;&nbsp; [PyPI](https://pypi.org/project/orionagent/) &nbsp;&bull;&nbsp; [Issue Tracker](https://github.com/Sam-Dev-AI/OrionAgent/issues)
 

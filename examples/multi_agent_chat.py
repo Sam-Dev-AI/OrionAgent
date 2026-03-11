@@ -1,5 +1,5 @@
 """
-OrionAI: Autonomous Multi-Agent Orchestration
+OrionAgent: Autonomous Multi-Agent Orchestration
 Advanced Delegation, Planning & Self-Correction.
 
 This script demonstrates the 'Manager' pattern, where a central brain coordinates 

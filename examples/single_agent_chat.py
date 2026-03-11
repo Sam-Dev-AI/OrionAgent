@@ -1,5 +1,5 @@
 """
-OrionAI: 10-Second Power Example
+OrionAgent: 10-Second Power Example
 Simple, Persistent & Industrially Robust.
 
 This script demonstrates a high-performance single agent utilizing:
@@ -38,7 +38,7 @@ def calculate_roi(investment: float, revenue: float):
 
 def main():
     # 3. INITIALIZE THE CORE ENGINE
-    # OrionAI uses provider-native drivers for maximum speed.
+    # OrionAgent uses provider-native drivers for maximum speed.
     llm = Gemini(model_name="gemini-2.0-flash", token_count=True)
 
     # 4. DEFINE THE 'VANGUARD' AGENT
