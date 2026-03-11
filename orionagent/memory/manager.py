@@ -37,30 +37,34 @@ class MemoryPipeline:
         messages_to_summarize = session.messages[:self.config.chunk_size]
         text_to_summarize = "\n".join([f"[{m['role']}] {m['content']}" for m in messages_to_summarize])
         
-        # Token efficiency: if priority is low, just do a tiny summary
+        # Tiered Summarization Logic
         if session.priority == "low":
+            # 1. LOW: Minimalist 1-sentence summary, no entities
             prompt = f"Provide a one-sentence summary of this conversation segment. Be extremely concise.\n\n{text_to_summarize}"
-            try:
-                summary = llm.generate(prompt=prompt, system_instruction="You are a minimalist summarizer.")
-                session.chunk_summaries.append(summary)
-                session.messages = session.messages[self.config.chunk_size:]
-                self.session_manager.save(session)
-                return
-            except Exception:
-                return
+            system_instruction = "You are a minimalist summarizer."
+        elif session.priority == "high":
+            # 2. HIGH: Exhaustive detail + Structured Extraction
+            categories = ", ".join(self.config.entity_categories)
+            prompt = (
+                f"Provide a DETAILED summary of the conversation and exhaustively extract every key entity and fact.\n"
+                f"Output MUST be strict JSON:\n"
+                f'{{"summary": "A detailed multi-paragraph summary", "entities": [ {{"name": "...", "category": "...", "value": "...", "importance": 1-10}} ]}}\n\n'
+                f"Use categories: {categories}.\n\nCONVERSATION:\n{text_to_summarize}"
+            )
+            system_instruction = "You are an expert at exhaustive structured information extraction."
+        else:
+            # 3. MEDIUM (Default): Balanced summary + Structured Extraction
+            categories = ", ".join(self.config.entity_categories)
+            prompt = (
+                f"Summarize the conversation segment and extract key entities/facts.\n"
+                f"Output MUST be strict JSON:\n"
+                f'{{"summary": "A concise summary", "entities": [ {{"name": "...", "category": "...", "value": "...", "importance": 1-10}} ]}}\n\n'
+                f"Use categories: {categories}.\n\nCONVERSATION:\n{text_to_summarize}"
+            )
+            system_instruction = "You are an expert at extracting structured information."
 
-        # Normal/High priority: Structured JSON extraction
-        categories = ", ".join(self.config.entity_categories)
-        prompt = (
-            f"Summarize the following conversation segment and extract key entities/facts.\n"
-            f"Output MUST be strict JSON in this format:\n"
-            f'{{"summary": "A concise summary", "entities": [ {{"name": "...", "category": "...", "value": "...", "importance": 1-10}} ]}}\n\n'
-            f"Use categories: {categories}.\n\n"
-            f"CONVERSATION:\n{text_to_summarize}"
-        )
-        
         try:
-            raw_response = llm.generate(prompt=prompt, system_instruction="You are an expert at extracting structured information and summarizing conversations into JSON format.")
+            raw_response = llm.generate(prompt=prompt, system_instruction=system_instruction)
             
             import json
             import re

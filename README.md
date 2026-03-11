@@ -143,16 +143,21 @@ agent = Agent(
         mode="long_term",
         extract_entities=True,      # Enable Structured Knowledge Extraction
         importance_threshold=7,     # Sync facts to SQLite if importance >= 7
-        priority="low"              # Default Priority: 'low' (minimalist summaries)
+        priority="medium"           # Default Priority: 'medium' (Balanced)
     )
 )
 
+# Priority Tiers Explained:
+# - 'low': Minimalist 1-sentence summary, no entity extraction (Token Saver).
+# - 'medium' (Default): Balanced summary + Structured entity extraction.
+# - 'high': Detailed multi-paragraph summary + Exhaustive extraction.
+
 # Explicitly override priority for a session
-agent.ask("Deep analysis of these docs", priority="high")
+agent.ask("Urgent technical deep-dive", priority="high")
 ```
-- **Structured Knowledge Vault**: Automatically extracts facts (Names, Roles, Decisions) into a JSON schema, ensuring 100% accuracy even in very long conversations.
+- **Structured Knowledge Vault**: Automatically extracts facts (Names, Roles, Decisions) into a JSON schema, ensuring 100% accuracy even in very long conversations. Enabled on `medium` and `high` priorities.
 - **Lifetime Sync Logic**: Periodically mirrors high-importance facts from temporary sessions to a permanent SQLite database.
-- **Priority Summarization**: Toggle between `high` (deep knowledge) and `low` (token-saving) modes per conversation.
+- **Priority Summarization**: Toggle between `low` (token-saving), `medium` (balanced), and `high` (deep knowledge) modes.
 
 ### 3. Strategic Orchestration (`strategy`)
 The `Manager` employs recursive strategy loops to decompose and execute complex goals.

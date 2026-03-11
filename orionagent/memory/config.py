@@ -22,7 +22,7 @@ class MemoryConfig:
     vector_top_k: int = 5
     storage_path: str = "memory"
     extract_entities: bool = True
-    priority: str = "low"
+    priority: str = "medium"
     entity_categories: list = field(default_factory=lambda: ["Personal", "Preference", "Decision", "Professional"])
 
     def __post_init__(self):
@@ -42,6 +42,6 @@ class MemoryConfig:
             vector_top_k=data.get("vector_top_k", 5),
             storage_path=data.get("storage_path", "memory"),
             extract_entities=data.get("extract_entities", True),
-            priority=data.get("priority", "low"),
+            priority=data.get("priority", "medium"),
             entity_categories=data.get("entity_categories", ["Personal", "Preference", "Decision", "Professional"])
         )
