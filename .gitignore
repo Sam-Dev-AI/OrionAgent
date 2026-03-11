@@ -155,5 +155,7 @@ mgr_vault/
 memory/storage/
 *.db
 *.json
-!pyproject.toml
+pyproject.toml
+test_minimal.py
 !README.md
+
