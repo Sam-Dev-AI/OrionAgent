@@ -63,7 +63,7 @@ agent = Agent(
     name="Vanguard",
     role="Research Analyst",
     model=Gemini("gemini-2.0-flash"),
-    memory="persistent",         # Automatic SQLite Knowledge Storage
+    memory="long_term",          # Automatic SQLite Knowledge Storage
     use_default_tools=True,      # Integrated Web, File, and OS tools
     tools=[crypto_ticker],
     guards=["straight", "short"], # Deterministic Output Validation
@@ -132,20 +132,20 @@ Control exactly how your agents retain knowledge. Use the simple string shorthan
 
 ```python
 # Shorthand usage
-agent = Agent(memory="persistent")
+agent = Agent(memory="long_term")
 
 # Advanced configuration with custom storage path
 from orionagent import MemoryConfig
 agent = Agent(
     memory=MemoryConfig(
-        mode="persistent", 
+        mode="long_term", 
         storage_path="./data/shared_memory"
     )
 )
 ```
 - **`none`**: Stateless. No data stored (ideal for utilities).
 - **`session`**: Short-term. Remembers raw turn history for context.
-- **`persistent`**: Long-term. Persists facts into an optimized SQLite DB.
+- **`long_term`**: Industrial persistence. Automatically distills facts into an optimized SQLite DB.
 
 ### 3. Strategic Orchestration (`strategy`)
 The `Manager` employs recursive strategy loops to decompose and execute complex goals.
@@ -217,7 +217,7 @@ manager = Manager(
 OrionAgent minimizes operational overhead by pruning unnecessary context and optimizing prompt density:
 
 - **Sliding Window Session Memory**: Automatically manages conversation history to prevent context window saturation and rising latency.
-- **Hierarchical Knowledge Briefing**: Instead of feeding raw history, the `persistent` memory tier distills facts into a concise **Knowledge Brief** stored in SQLite, reducing per-turn token usage by up to 70%.
+- **Hierarchical Knowledge Briefing**: Instead of feeding raw history, the `long_term` memory tier distills facts into a concise **Knowledge Brief** stored in SQLite, reducing per-turn token usage by up to 70%.
 - **Compact Planning Prompt**: The `Strategy` engine uses a specialized, ultra-lean prompt (~100 tokens) to decompose tasks, ensuring that the heavy lifting is done with minimal structural baggage.
 - **Precision Tool Routing**: Agents only receive the context relevant to the specific step they are executing, preventing "prompt pollution" from unrelated task phases.
 

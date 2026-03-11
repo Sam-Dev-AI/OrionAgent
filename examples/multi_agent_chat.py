@@ -38,7 +38,7 @@ def main():
         name="Logic-Analyst",
         role="Business Strategy Consultant",
         description="Analyzes raw data to extract ROI, risks, and strategic trends.",
-        memory="persistent",       # Retains business logic context across runs
+        memory="long_term",        # Retains business logic context across runs
         guards=["short", "straight"], # Enforcement: Brief, no emoji, professional tone
         verbose=True
     )

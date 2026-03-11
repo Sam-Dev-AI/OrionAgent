@@ -48,7 +48,7 @@ def main():
         role="Intelligence Analyst",
         system_instruction="Provide objective, data-backed insights. No fluff.",
         model=llm,
-        memory="persistent",       # Seamlessly saves conversation to memory/orionagent.db
+        memory="long_term",        # Seamlessly saves conversation to memory/orionagent.db
         use_default_tools=True,    # Injects Web Search, Terminal, Python, and Files tools
         tools=[analyze_sentiment, get_crypto_price, calculate_roi],
         guards=["straight", "short"], # Logic Guards: No emojis, Max 3 sentences
