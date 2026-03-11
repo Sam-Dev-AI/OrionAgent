@@ -152,10 +152,11 @@ cython_debug/
 
 # Project specific
 mgr_vault/
-memory/storage/
+memory/
 *.db
 *.json
 pyproject.toml
 test_minimal.py
 !README.md
+
 
