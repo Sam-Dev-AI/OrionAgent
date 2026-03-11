@@ -157,6 +157,7 @@ memory/
 *.json
 pyproject.toml
 test_minimal.py
+tests/
 !README.md
 
 

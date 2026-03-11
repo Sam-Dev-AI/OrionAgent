@@ -36,7 +36,33 @@ When defining an `Agent`, every parameter is tunable for specific engineering ne
 
 ---
 
-## 🛡️ 3. Logic Guardrails (Deterministic Output)
+## 💬 3. Interaction Interfaces: `.ask()` vs `.chat()`
+
+Understanding how to trigger an agent is key to preventing redundant loops or lost context.
+
+### A. `agent.ask(prompt)`
+- **Nature**: One-off execution.
+- **Workflow**: 
+    1. Send prompt.
+    2. Agent executes (with tools/guards).
+    3. Return final string.
+- **When to use**: Backend API calls, data extraction, or single-turn tasks where you don't need a back-and-forth conversation.
+
+### B. `agent.chat()` or `chat(agent)`
+- **Nature**: Interactive Loop.
+- **Workflow**: 
+    1. Starts a persistent terminal session.
+    2. Maintains a `You: ` prompt.
+    3. Supports multi-turn memory natively.
+- **When to use**: Debugging, human-in-the-loop experimentation, or building "Chatbot" style interfaces.
+
+### C. `manager.chat(greeting)`
+- **The Orchestration Loop**: Unlike a single agent, the `Manager`'s `.chat()` triggers the **Strategy Engine**. 
+- If `strategy=["planning", "self_learn"]` is set, every message you send triggers a full planning/execution/evaluation cycle before the Manager responds.
+
+---
+
+## 🛡️ 4. Logic Guardrails (Deterministic Output)
 
 Logic guards audit LLM outputs before they are delivered. If a guard fails, the agent is given an automated `[GUARD FAILURE]` message and **one chance to self-correct**.
 
@@ -60,7 +86,7 @@ agent = Agent(guards=[my_custom_guard])
 
 ---
 
-## 💾 4. Memory Mastery (Priority Tiers)
+## 💾 5. Memory Mastery (Priority Tiers)
 
 OrionAgent uses a **Tiered Logic Engine** to manage context. This is the #1 way to save tokens in long-running sessions.
 
@@ -74,7 +100,7 @@ OrionAgent uses a **Tiered Logic Engine** to manage context. This is the #1 way 
 
 ---
 
-## ⚙️ 5. Advanced Internals: The Execution Lifecycle
+## ⚙️ 6. Advanced Internals: The Execution Lifecycle
 
 ### A. Tool Execution Flow (Sync vs Async)
 OrionAgent uses a **Parallel Tool Dispatcher**. When an agent calls multiple tools:
@@ -93,7 +119,7 @@ When using `strategy=["planning", "self_learn"]`:
 
 ---
 
-## 🎯 6. The Strategy Playbook
+## 🖋️ 7. The Strategy Playbook
 
 The `Manager` uses strategies to handle complex goals. You can chain them: `strategy=["planning", "self_learn"]`.
 
@@ -115,7 +141,7 @@ The `Manager` uses strategies to handle complex goals. You can chain them: `stra
 
 ---
 
-## 🚀 7. Large-Scale Engineering Examples
+## 🚀 8. Large-Scale Engineering Examples
 
 ### Example A: The Autonomous Development Swarm
 A multi-agent setup where one agent plans, one codes, and one audits, with the Manager ensuring quality.
@@ -173,7 +199,7 @@ agent.ask("Who approved the Q1 budget?") # Auto-retrieves from SQLite
 
 ---
 
-## 🔍 8. Performance & Efficiency Tips
+## 🔍 9. Performance & Efficiency Tips
 
 1.  **Prefer `Gemini` for speed**: Its native caching makes it the fastest for high-tool use.
 2.  **Enable `async_mode`**: Always keep this True (default) for agents using terminal or web-scrapers to avoid blocking.
@@ -183,7 +209,7 @@ agent.ask("Who approved the Q1 budget?") # Auto-retrieves from SQLite
 
 ---
 
-## 💎 9. The "Kitchen Sink" Example (Pro Edition)
+## 💎 10. The "Kitchen Sink" Example (Pro Edition)
 
 ```python
 import os

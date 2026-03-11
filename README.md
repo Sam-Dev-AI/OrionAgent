@@ -47,6 +47,16 @@ Install OrionAgent via pip for immediate industrial-grade orchestration:
 pip install orionagent
 ```
 
+### Development Setup
+
+If you are cloning the repository to run examples or contribute, install in **editable mode** to ensure all local resources are correctly mapped:
+
+```bash
+git clone https://github.com/Sam-Dev-AI/OrionAgent.git
+cd OrionAgent
+pip install -e .
+```
+
 ---
 
 ## Quick Start
