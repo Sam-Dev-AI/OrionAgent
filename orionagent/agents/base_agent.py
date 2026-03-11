@@ -156,9 +156,8 @@ class Agent:
         if not session:
             session = Session(self.user_id, self.name, sid)
 
-        # Update session priority if provided
-        if priority:
-            session.priority = priority
+        # Update session priority if provided or use config default
+        session.priority = priority or self.memory_config.priority
 
         prompt = task
         if self.memory_config.mode != "none":

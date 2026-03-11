@@ -142,13 +142,13 @@ agent = Agent(
     memory=MemoryConfig(
         mode="long_term",
         extract_entities=True,      # Enable Structured Knowledge Extraction
-        importance_threshold=7      # Sync facts to SQLite if importance >= 7
+        importance_threshold=7,     # Sync facts to SQLite if importance >= 7
+        priority="low"              # Default Priority: 'low' (minimalist summaries)
     )
 )
 
-# Start a session with specific priority
-agent.chat(priority="high") # Deep analysis & entity extraction
-agent.chat(priority="low")  # Minimalist summaries (saves tokens)
+# Explicitly override priority for a session
+agent.ask("Deep analysis of these docs", priority="high")
 ```
 - **Structured Knowledge Vault**: Automatically extracts facts (Names, Roles, Decisions) into a JSON schema, ensuring 100% accuracy even in very long conversations.
 - **Lifetime Sync Logic**: Periodically mirrors high-importance facts from temporary sessions to a permanent SQLite database.
