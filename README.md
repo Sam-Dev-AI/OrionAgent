@@ -1,4 +1,4 @@
-# OrionAI
+# OrionAgent
 ### The Sovereign Multi-Agent Orchestration Framework
 
 <div align="center">
@@ -10,6 +10,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
+
+**OrionAI is built for performance. It eliminates the abstraction tax of modern agent frameworks, providing a low-latency, high-control environment for mission-critical AI applications.**
 
 [Quick Start](#quick-start) &nbsp;&bull;&nbsp; [Core Configuration](#core-configuration--api-reference) &nbsp;&bull;&nbsp; [Architecture](#architecture-blueprints) &nbsp;&bull;&nbsp; [Memory Tier](#memory-architecture--patterns) &nbsp;&bull;&nbsp; [OrionAI vs Others](#orionagent-vs-langchain--autogen)
 
@@ -88,7 +90,7 @@ OrionAI utilizes a declarative configuration system to ensure industrial-grade r
 | `session` | Short-term context retention. | RAM / JSON |
 | `persistent` | Vector-summarized knowledge. | SQLite Knowledge Base |
 
-### 🧠 Strategic Orchestration
+### Strategic Orchestration
 *   **Planning**: Decomposes complex goals into parallelizable task arrays.
 *   **Self-Learn**: Dynamically evaluates agent quality and re-delegates on failure (The **Verdict** Loop).
 *   **@tool**: Decorator for seamless Python function-to-tool conversion.
@@ -163,7 +165,20 @@ graph TD
 
 ---
 
-## Project Roadmap
+## Contributing & Community
+
+OrionAI is an open ecosystem. We value contributions that maintain the framework's minimalistic core.
+
+*   **Reporting Bugs**: Use the GitHub Issue Tracker.
+*   **Feature Requests**: Open a Discussion thread for architectural review.
+*   **Pull Requests**: Ensure all new tools follow the `@tool` schema validation protocol.
+
+---
+
+## Support & Roadmap
+
+If you find OrionAI valuable, consider starring the repository to support its development.
+
 *   **Vitals Dashboard**: Real-time telemetry Web UI.
 *   **Human-in-the-Loop**: Interactive approval gates for critical tool calls.
 *   **Async Multi-Clusters**: Parallelized strategy execution across processes.
@@ -171,10 +186,13 @@ graph TD
 ---
 
 ## License & Contact
-Released under the **MIT License**. Created by Samir Lade.
 
 <div align="center">
 
+Released under the **MIT License**. Created by [Samir Lade](mailto:ladesamir10@gmail.com).
+
 **OrionAI: Build Agents That Actually Work.**
+
+[GitHub](https://github.com/Sam-Dev-AI/OrionAgent) &nbsp;&bull;&nbsp; [PyPI](https://pypi.org/project/orionagent/) &nbsp;&bull;&nbsp; [Issue Tracker](https://github.com/Sam-Dev-AI/OrionAgent/issues)
 
 </div>
