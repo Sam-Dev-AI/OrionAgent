@@ -17,8 +17,8 @@ class Gemini(ModelProvider):
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
         model_name: str = "gemini-2.0-flash",
+        api_key: Optional[str] = None,
         token_count: bool = False,
         streaming: bool = True,
         verbose: bool = False,
