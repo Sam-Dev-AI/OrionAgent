@@ -44,18 +44,6 @@ Install OrionAgent via pip for immediate industrial-grade orchestration:
 pip install orionagent
 ```
 
-### Verification
-
-Validate your installation with a minimal smoke test:
-
-```python
-from orionagent import Agent
-
-agent = Agent(memory="session", model="gemini")
-print(f"Memory mode: {agent.memory_config.mode}")
-print("Verification Success")
-```
-
 ---
 
 ## Quick Start
