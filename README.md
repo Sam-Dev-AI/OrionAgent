@@ -1,15 +1,18 @@
-# OrionAgent
+# OrionAI
 ### The Sovereign Multi-Agent Orchestration Framework
 
 <div align="center">
 
-**A minimalistic yet industrially robust framework. Precision-engineered for memory persistence, logic validation, and autonomous self-correction.**
+*An Industrially Robust, Minimalistic Multi-Agent System featuring Deterministic Persistence and Logic Validation*
 
-[![PyPI version](https://img.shields.io/badge/pypi-v0.4.0-blue.svg)](https://pypi.org/project/orionagent/)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<br />
 
----
+![Python](https://img.shields.io/badge/Python-3.8+-blue?style=for-the-badge&logo=python&logoColor=white)
+![Gemini](https://img.shields.io/badge/Gemini-2.0--Flash-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-Persistence-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+
+<br />
 
 **OrionAI is built for performance. It eliminates the abstraction tax of modern agent frameworks, providing a low-latency, high-control environment for mission-critical AI applications.**
 
@@ -18,6 +21,14 @@
 ---
 
 </div>
+
+## Overview
+
+**OrionAI** is a cutting-edge multi-agent orchestration framework designed to democratize professional-grade agentic workflows. Powered by the **Orion Engine**—a smart conversational core fusing **Generative AI (Gemini 2.0)** with **Deterministic Logic Guards**—OrionAI offers real-time, actionable task execution for industrial-scale projects.
+
+Whether you are building complex research swarms or precision-driven automation pipelines, the **Orion Agent** acts as your 24/7 technical companion, ensuring every output is validated, persistent, and token-efficient.
+
+---
 
 ## Philosophy
 
