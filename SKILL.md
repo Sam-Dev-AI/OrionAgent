@@ -352,4 +352,15 @@ When an agent is initialized with `knowledge`, it automatically receives two hig
 
 ---
 
+## ⚡ 12. Performance & Token Optimization
+
+OrionAgent is engineered to solve the "abstraction tax" of other frameworks.
+
+### "Clean Brain" Optimization
+- **Intelligent Pruning**: Once a session summary is created, the agent automatically trims the raw history to the last 6 messages. 
+- **Compact Headers**: Internal headers are minimized (e.g., `### LTM:`) to maximize the prompt space available for the agent's reasoning.
+- **Strategy Radar**: Simple conversational turns automatically bypass orchestration strategies, resulting in instant responses and 0 orchestration token cost.
+
+---
+
 **OrionAgent: Build Agents That Actually Work.**
