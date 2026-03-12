@@ -323,4 +323,33 @@ chat(manager, greeting="Orion System Online. Deployment Authorized.")
 
 ---
 
+## 📚 11. Advanced Knowledge (RAG)
+
+OrionAgent features an industrial-grade **Retrieval-Augmented Generation (RAG)** engine. This allows agents to ingest private documents (PDF, MD, TXT) and retrieve facts with semantic precision.
+
+### A. The Knowledge Module
+The `KnowledgeBase` manages a dedicated vector collection in ChromaDB, separate from conversation memory.
+
+```python
+from orionagent import Agent, KnowledgeBase
+
+# 1. Initialize a named knowledge collection
+kb = KnowledgeBase(collection_name="project_nebula")
+
+# 2. Assign to an agent
+agent = Agent(name="Researcher", knowledge=kb)
+```
+
+### B. Automated RAG Tools
+When an agent is initialized with `knowledge`, it automatically receives two high-performance tools:
+
+1.  **`ingest_file(file_path)`**: Automatically reads, chunks, and indexes a local file.
+2.  **`query_knowledge(query)`**: Performs a semantic search across the entire knowledge base and returns relevant snippets.
+
+### C. Manual Ingestion vs. Tool-Based
+- **Manual**: Use `kb.ingest_file("data.pdf")` before starting the agent to "pre-load" its brain.
+- **Agentic**: Ask the agent to read a file: `"Agent, please read the manual at C:/docs/manual.pdf"`. It will call the tool and learn the contents dynamically.
+
+---
+
 **OrionAgent: Build Agents That Actually Work.**

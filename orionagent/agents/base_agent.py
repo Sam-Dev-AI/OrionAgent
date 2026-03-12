@@ -18,7 +18,8 @@ from orionagent.memory.config import MemoryConfig
 from orionagent.memory.session import SessionManager, Session
 from orionagent.memory.manager import MemoryPipeline, AgentMemoryProxy
 from orionagent.memory.storage.sqlite_storage import SQLiteStorage
-from orionagent.memory.storage.sqlite_storage import SQLiteStorage
+from orionagent.knowledge.knowledge_base import KnowledgeBase
+from orionagent.tools.rag_tools import IngestTool, QueryKnowledgeTool
 
 
 
@@ -56,6 +57,7 @@ class Agent:
         verbose: bool = False,
         async_mode: bool = True,
         debug: bool = False,
+        knowledge: Optional[Union[str, KnowledgeBase]] = None,
     ):
         self.name = name
         self.role = role
@@ -112,6 +114,16 @@ class Agent:
             self._merge_default_tools()
 
         self.tool_executor = ToolExecutor(async_mode=self.async_mode)
+
+        # --- Knowledge / RAG setup ---
+        if isinstance(knowledge, str):
+            self.knowledge = KnowledgeBase(collection_name=knowledge)
+        else:
+            self.knowledge = knowledge
+
+        if self.knowledge:
+            self.tools.append(IngestTool(self.knowledge))
+            self.tools.append(QueryKnowledgeTool(self.knowledge))
 
         # --- Strategy ---
         from orionagent.agents.strategies import get_strategy

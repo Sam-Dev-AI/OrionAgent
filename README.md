@@ -275,6 +275,27 @@ OrionAgent minimizes operational overhead by pruning unnecessary context and opt
 - **Precision Tool Routing**: Agents only receive the context relevant to the specific step they are executing, preventing "prompt pollution" from unrelated task phases.
 
 
+### Knowledge Base Integration (RAG)
+Teach your agent to read local PDFs and Markdown files for private knowledge retrieval.
+
+```python
+from orionagent import Agent, Gemini
+
+# Initialize with a knowledge collection
+agent = Agent(
+    name="Researcher",
+    model=Gemini("gemini-2.0-flash"),
+    knowledge="corporate_docs" # Creates a persistent index
+)
+
+# 1. Ingest content (Manual or via Chat)
+agent.ask("Please read compliance_2024.pdf")
+
+# 2. Query it
+answer = agent.ask("What are the new security protocols for 2024?")
+print(answer)
+```
+
 ---
 
 ## Architecture Blueprints
