@@ -36,6 +36,7 @@ class BaseStrategy:
         verbose: bool = False,
         debug: bool = False,
         record_trace: bool = True,
+        hitl: bool = False,
     ) -> Union[str, Generator[str, None, None], "AgentHandoff"]:
         """Run the strategy on *task* using the given *agents*.
 

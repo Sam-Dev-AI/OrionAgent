@@ -29,6 +29,7 @@ class DirectStrategy(BaseStrategy):
         verbose: bool = False,
         debug: bool = False,
         record_trace: bool = True,
+        hitl: bool = False,
     ) -> Union[str, Generator[str, None, None], Any]:
 
         prompt = f"{context}\n\n==== CURRENT TASK ====\n{task}" if context else task
@@ -43,6 +44,8 @@ class DirectStrategy(BaseStrategy):
             # No agent matched keywords (e.g. "hi", "what is your name?")
             # Handled by the Manager level model
             if model:
+                if hitl:
+                    self._approve_direct(task, "Manager (Internal)")
                 if stream:
                     return self._stream_manager(model, prompt, system_instruction, temperature, tools)
                 return model.generate(
@@ -55,11 +58,27 @@ class DirectStrategy(BaseStrategy):
                 # No model and no agent match? Fallback to first agent as a safety
                 selected = agents[0]
 
+        if hitl:
+            self._approve_direct(task, selected.name)
+
         if stream:
             return self._stream_response(selected, prompt, model, record_trace=record_trace, temperature=temperature)
         
         result = selected.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=record_trace, temperature=temperature)
         return result
+
+    def _approve_direct(self, task: str, agent_name: str):
+        """Interactive terminal approval for single delegation."""
+        print(f"\n\033[1m[ORION HITL] Delegation Approval Required\033[0m")
+        print(f"Goal: {task}")
+        print(f"Target Agent: {agent_name}")
+        print("-" * 40)
+        choice = input("Approve delegation? (y/n): ").strip().lower()
+        if choice != 'y':
+            print("\033[31m[ABORTED] Delegation rejected by user.\033[0m")
+            raise InterruptedError("Delegation rejected by user via HITL.")
+        print("\033[32m[APPROVED] Executing...\033[0m\n")
+
 
     @staticmethod
     def _stream_manager(

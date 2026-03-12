@@ -142,35 +142,37 @@ agent = Agent(
 - **`straight`**: Removes "fluff" (e.g. "I hope this helps") and emojis.
 - **`short` / `long`**: Strictly controls the sentence count/density.
 
-### 2. Intelligent Memory Architecture
-OrionAgent features a multi-tier memory system designed for extreme token efficiency and long-term accuracy.
+### 2. Memory Levels (`memory`)
+OrionAgent uses a **Tiered Logic Engine** to scale context. Select your ecosystem power level:
+
+| Level | Mode | Behavior | Power |
+| :--- | :--- | :--- | :--- |
+| **1** | `none` | No memory. Static responses only. | Static |
+| **2** | `session` | Fast temporary conversation buffer. | Medium |
+| **3** | `long_term`| Session + Persistent SQLite (Fact Recall). | High |
+| **4** | `chroma` | **Session + SQLite + Vector Knowledge (Semantic RAG).**| **Ultimate** |
 
 ```python
-# Shorthand usage
-agent = Agent(memory="long_term")
+# Initialize an agent with the 'Ultimate' level
+from orionagent import Agent
+agent = Agent(memory="chroma")
 
 # Advanced configuration
 from orionagent import MemoryConfig
 agent = Agent(
     memory=MemoryConfig(
-        mode="long_term",
-        extract_entities=True,      # Enable Structured Knowledge Extraction
-        importance_threshold=7,     # Sync facts to SQLite if importance >= 7
-        priority="medium"           # Default Priority: 'medium' (Balanced)
+        mode="chroma",
+        priority="high",            # Depth: 'low', 'medium', or 'high'
+        extract_entities=True,      # Enable Knowledge Extraction
+        importance_threshold=7      # Sync threshold (1-10)
     )
 )
-
-# Priority Tiers Explained:
-# - 'low': Minimalist 1-sentence summary, no entity extraction (Token Saver).
-# - 'medium' (Default): Balanced summary + Structured entity extraction.
-# - 'high': Detailed multi-paragraph summary + Exhaustive extraction.
-
-# Explicitly override priority for a session
-agent.ask("Urgent technical deep-dive", priority="high")
 ```
-- **Structured Knowledge Vault**: Automatically extracts facts (Names, Roles, Decisions) into a JSON schema, ensuring 100% accuracy even in very long conversations. Enabled on `medium` and `high` priorities.
-- **Lifetime Sync Logic**: Periodically mirrors high-importance facts from temporary sessions to a permanent SQLite database.
-- **Priority Summarization**: Toggle between `low` (token-saving), `medium` (balanced), and `high` (deep knowledge) modes.
+
+- **Semantic Memory (Chroma)**: Level 4 allows for industrial-scale knowledge persistence using vector embeddings, enabling high-quality RAG.
+- **Structured Knowledge Vault**: Automatically extracts facts (Names, Roles, Decisions) into a JSON schema, ensuring 100% accuracy.
+- **Priority Tiers**: Control how deep the extraction goes with `low` (token-saving), `medium` (balanced), and `high` (exhaustive) tiers.
+
 
 ### 3. Strategic Orchestration (`strategy`)
 The `Manager` employs recursive strategy loops to decompose and execute complex goals.

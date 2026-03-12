@@ -39,7 +39,7 @@ def calculate_roi(investment: float, revenue: float):
 def main():
     # 3. INITIALIZE THE CORE ENGINE
     # OrionAgent supports multiple providers (Gemini, OpenAI, Ollama).
-    llm = Gemini(model_name="gemini-2.5-flash", token_count=True, debug=True)
+    llm = Gemini(model_name="gemini-2.5-flash", token_count=True, debug=True,api_key="Your_API_Key")
 
     # 4. DEFINE THE 'VANGUARD' AGENT
     # Precision-engineered to be ultra-efficient and direct.

@@ -18,6 +18,8 @@ from orionagent.memory.config import MemoryConfig
 from orionagent.memory.session import SessionManager, Session
 from orionagent.memory.manager import MemoryPipeline, AgentMemoryProxy
 from orionagent.memory.storage.sqlite_storage import SQLiteStorage
+from orionagent.memory.storage.sqlite_storage import SQLiteStorage
+
 
 
 class Agent:
@@ -87,8 +89,17 @@ class Agent:
             
         import os
         self._session_manager = SessionManager(base_dir=self.memory_config.storage_path)
-        db_file = os.path.join(self.memory_config.storage_path, "orionagent.db")
-        self._persistent_db = SQLiteStorage(db_path=db_file) if self.memory_config.mode == "persistent" else None
+        
+        # Storage Selection (Hierarchical)
+        if self.memory_config.mode in ["persistent", "long_term", "chroma"]:
+            db_file = os.path.join(self.memory_config.storage_path, "orionagent.db")
+            # chroma mode is the ultimate level (SQLite + Chroma)
+            use_vdb = (self.memory_config.mode == "chroma")
+            self._persistent_db = SQLiteStorage(db_path=db_file, use_chroma=use_vdb)
+        else:
+            self._persistent_db = None
+
+            
         self._memory_pipeline = MemoryPipeline(self.memory_config, self._persistent_db)
         
         # Public proxy for developers to call agent.memory.view(), etc.
@@ -112,7 +123,7 @@ class Agent:
             self.ask = apply_guards(self.ask, guards)
 
         # --- Memory tools (auto-injected) ---
-        if self.memory_config.mode == "persistent":
+        if self.memory_config.mode in ["persistent", "chroma"]:
             self.tools.append(SaveMemoryTool(self.memory, self.user_id))
             self.tools.append(SearchMemoryTool(self.memory, self.user_id))
 

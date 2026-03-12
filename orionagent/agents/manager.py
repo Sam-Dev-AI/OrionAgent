@@ -72,6 +72,7 @@ class Manager:
         verbose: bool = False,
         async_mode: bool = True,
         debug: bool = False,
+        hitl: bool = False,
     ):
         self.name = name
         self._agents: List[Agent] = []
@@ -83,6 +84,8 @@ class Manager:
         self.verbose = verbose or (getattr(self._model, "verbose", False) if self._model else False)
         self.debug = debug or (getattr(self._model, "debug", False) if self._model else False)
         self.async_mode = async_mode
+        self.hitl = hitl
+
         
         # --- Memory setup (Same as Agent) ---
         from orionagent.memory.config import MemoryConfig
@@ -212,7 +215,9 @@ class Manager:
             verbose=self.verbose,
             debug=self.debug,
             record_trace=False,
+            hitl=self.hitl,
         )
+
         
         # Handle Handoff objects (Direct Return)
         if isinstance(result, AgentHandoff):

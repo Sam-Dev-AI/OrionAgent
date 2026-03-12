@@ -86,9 +86,24 @@ agent = Agent(guards=[my_custom_guard])
 
 ---
 
-## 💾 5. Memory Mastery (Priority Tiers)
+## 💾 5. Memory Mastery (Hierarchy & Tiers)
 
-OrionAgent uses a **Tiered Logic Engine** to manage context. This is the #1 way to save tokens in long-running sessions.
+OrionAgent uses a **Dual-Layer Logic Engine** to manage context. This is the #1 way to save tokens in long-running sessions.
+
+### A. The 4 Levels of Memory (Hierarchy)
+Select the "Power Level" of your agent's memory based on your ecosystem needs:
+
+| Level | Mode | Behavior | Power |
+| :--- | :--- | :--- | :--- |
+| **1** | `none` | No memory. Static responses only. | Static |
+| **2** | `session` | Fast temporary conversation buffer. | Medium |
+| **3** | `long_term`| Session + Persistent SQLite (Structured Fact Recall). | High |
+| **4** | `chroma` | **Session + SQLite + Vector Knowledge (Semantic RAG).**| **Ultimate** |
+
+---
+
+### B. Priority Tiers (Extraction Depth)
+Once you have `long_term` or `chroma` enabled, you can tune how deep the entity extraction goes:
 
 | Tier | Name | Behavior | Token Cost |
 | :--- | :--- | :--- | :--- |
@@ -96,7 +111,8 @@ OrionAgent uses a **Tiered Logic Engine** to manage context. This is the #1 way 
 | **`medium`** | **Default** | Balanced summary + Structured entity extraction. | ⚖️ Moderate |
 | **`high`** | Deep Knowledge| Detailed summaries + Exhaustive naming/fact extraction. | 📈 High |
 
-**Pro Tip**: Use `low` for casual agent interaction and `high` for research agents that must remember everything about a specific topic.
+**Pro Tip**: Use `chroma` mode for industrial knowledge bases (RAG) and `long_term` for simple user preferences.
+
 
 ---
 

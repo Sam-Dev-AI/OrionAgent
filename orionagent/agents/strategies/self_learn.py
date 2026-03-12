@@ -65,16 +65,17 @@ class SelfLearnStrategy(BaseStrategy):
         verbose: bool = False,
         debug: bool = False,
         record_trace: bool = True,
+        hitl: bool = False,
     ) -> Union[str, Generator[str, None, None]]:
         # Fast bypass for simple conversational tasks
         if not self.is_complex_task(task):
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl)
 
         if not model:
             # No model for eval -- fall back to single delegation
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl)
 
         # Check if we have a learned best agent for this task type
         learned_agent = self._get_learned_agent(task, agents)
@@ -83,13 +84,13 @@ class SelfLearnStrategy(BaseStrategy):
             # Known-good pattern -- skip eval, zero extra tokens
             
             if stream:
-                return learned_agent.ask(task, stream=True, use_strategy=False, record_memory=False, temperature=temperature)
-            return learned_agent.ask(task, stream=False, use_strategy=False, record_memory=False, temperature=temperature)
+                return learned_agent.ask(task, stream=True, use_strategy=False, record_memory=False, temperature=temperature, hitl=hitl)
+            return learned_agent.ask(task, stream=False, use_strategy=False, record_memory=False, temperature=temperature, hitl=hitl)
 
         # Cold path -- execute + evaluate + learn
         if stream:
-            return self._stream_with_learning(task, agents, model, system_instruction, context, temperature=temperature)
-        return self._execute_with_learning(task, agents, model, system_instruction, context, temperature=temperature)
+            return self._stream_with_learning(task, agents, model, system_instruction, context, temperature=temperature, hitl=hitl)
+        return self._execute_with_learning(task, agents, model, system_instruction, context, temperature=temperature, hitl=hitl)
 
     # ------------------------------------------------------------------
     # Learning logic (non-streaming)
@@ -103,6 +104,7 @@ class SelfLearnStrategy(BaseStrategy):
         system_instruction: Optional[str] = None,
         context: Optional[str] = None,
         temperature: Optional[float] = None,
+        hitl: bool = False,
     ) -> str:
         tried: Set[str] = set()
         selected = self.select_agent(task, agents)
@@ -116,7 +118,7 @@ class SelfLearnStrategy(BaseStrategy):
         for attempt in range(self.max_refinements + 1):
             tried.add(selected.name)
             
-            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature)
+            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature, hitl=hitl)
             
             score, feedback = self._evaluate(original_task, response, model, system_instruction, context)
 
@@ -160,6 +162,7 @@ class SelfLearnStrategy(BaseStrategy):
         system_instruction: Optional[str] = None,
         context: Optional[str] = None,
         temperature: Optional[float] = None,
+        hitl: bool = False,
     ) -> Generator[str, None, None]:
         tried: Set[str] = set()
         selected = self.select_agent(task, agents)
@@ -171,7 +174,7 @@ class SelfLearnStrategy(BaseStrategy):
 
         for attempt in range(self.max_refinements + 1):
             # Must collect full response for evaluation
-            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature)
+            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature, hitl=hitl)
 
             score, feedback = self._evaluate(original_task, response, model, system_instruction, context)
 

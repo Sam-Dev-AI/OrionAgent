@@ -47,23 +47,29 @@ class PlanningStrategy(BaseStrategy):
         verbose: bool = False,
         debug: bool = False,
         record_trace: bool = True,
+        hitl: bool = False,
+
     ) -> Union[str, Generator[str, None, None]]:
         from orionagent.tracing import tracer
         # Fast bypass for simple conversational tasks
         if not self.is_complex_task(task):
             tracer.log_event("plan", "Bypassing planner", "Simple task detected", verbose=verbose, debug=debug)
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl)
 
         if not model:
             # No model to plan with -- fall back to single delegation
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl)
 
         from orionagent.tracing import tracer
         trace_id = tracer.start_trace("plan", "Creating task plan", task, verbose=verbose, debug=debug)
         plan = self._create_plan(task, agents, model, system_instruction, context, temperature, verbose=verbose, debug=debug)
         tracer.end_trace(trace_id, f"Plan created: {len(plan)} steps")
+
+        # HITL Approval Gate
+        if hitl:
+            self._approve_plan(plan, task)
 
         if stream:
             return self._stream_plan(plan, agents, task, model, async_mode, temperature=temperature)
@@ -206,3 +212,23 @@ class PlanningStrategy(BaseStrategy):
                     
                     if is_final_group:
                         yield last_result
+                        
+    def _approve_plan(self, plan: list, original_task: str):
+        """Interactive terminal approval for the generated plan."""
+        print(f"\n\033[1m[ORION HITL] Task Approval Required\033[0m")
+        print(f"Goal: {original_task}")
+        print("-" * 40)
+        
+        for i, group in enumerate(plan, 1):
+            print(f"Group {i}:")
+            for step in group:
+                agent = step.get("a", step.get("agent", "Unknown"))
+                instr = step.get("s", step.get("step", ""))
+                print(f"  - [{agent}]: {instr}")
+        
+        print("-" * 40)
+        choice = input("Approve plan? (y/n): ").strip().lower()
+        if choice != 'y':
+            print("\033[31m[ABORTED] Plan rejected by user.\033[0m")
+            raise InterruptedError("Plan rejected by user via HITL.")
+        print("\033[32m[APPROVED] Executing plan...\033[0m\n")

@@ -17,7 +17,7 @@ class SQLiteStorage:
     If chromadb is installed, uses it for semantic retrieval.
     Otherwise falls back to SequenceMatcher similarity.
     """
-    def __init__(self, db_path: str = "memory/orionagent.db"):
+    def __init__(self, db_path: str = "memory/orionagent.db", use_chroma: bool = True):
         self.db_path = db_path
         base_dir = os.path.dirname(os.path.abspath(self.db_path))
         os.makedirs(base_dir, exist_ok=True)
@@ -26,15 +26,18 @@ class SQLiteStorage:
         self.use_chroma = False
         self.chroma_collection = None
         
-        try:
-            import chromadb
-            from chromadb.config import Settings
-            chroma_path = os.path.join(base_dir, "chroma_db")
-            chroma_client = chromadb.PersistentClient(path=chroma_path)
-            self.chroma_collection = chroma_client.get_or_create_collection(name="orion_memory")
-            self.use_chroma = True
-        except ImportError:
-            pass
+        if use_chroma:
+            try:
+                import chromadb
+                from chromadb.config import Settings
+                chroma_path = os.path.join(base_dir, "chroma_db")
+                chroma_client = chromadb.PersistentClient(path=chroma_path)
+                self.collection_name = "orion_memory"
+                self.chroma_collection = chroma_client.get_or_create_collection(name=self.collection_name)
+                self.use_chroma = True
+            except ImportError:
+                print("[WARNING] ChromaDB requested but not installed. Level falling back to SQLite only.")
+
             
     def _init_db(self):
         with sqlite3.connect(self.db_path) as conn:

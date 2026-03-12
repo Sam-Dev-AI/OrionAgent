@@ -6,15 +6,20 @@ class MemoryConfig:
     """Configuration for agent memory capabilities.
     
     Attributes:
-        mode: Memory mode ("none", "session", "persistent", or "long_term").
+        mode: Memory level:
+            - "none": No memory at all.
+            - "session": Fast temporary conversation buffer (Medium).
+            - "long_term": Session + Persistent SQLite facts (High).
+            - "chroma": Session + SQLite + Chroma Vector Knowledge (Ultimate).
         working_limit: How many recent facts/messages to keep in fast working memory.
+
         chunk_size: How many messages before triggering a chunk summarization.
         summary_tokens: Token limit for chunk summaries.
         importance_threshold: Minimum importance score (1-10) for long-term fact extraction.
         vector_top_k: How many relevant facts to retrieve from persistent memory.
         storage_path: Base directory for storing memory files. Defaults to "memory".
     """
-    mode: str = "session"
+    mode: str = "session" # none, session, persistent, long_term, chroma
     working_limit: int = 12
     chunk_size: int = 20
     summary_tokens: int = 120
@@ -29,6 +34,10 @@ class MemoryConfig:
         # Simplify mode names: long_term is a friendlier alias for persistent
         if self.mode == "long_term":
             self.mode = "persistent"
+        
+        # Ensure chroma storage uses a subfolder
+        if self.mode == "chroma" and self.storage_path == "memory":
+            self.storage_path = "memory/chroma_db"
 
     @classmethod
     def from_dict(cls, data: dict) -> "MemoryConfig":
@@ -45,3 +54,4 @@ class MemoryConfig:
             priority=data.get("priority", "medium"),
             entity_categories=data.get("entity_categories", ["Personal", "Preference", "Decision", "Professional"])
         )
+
