@@ -230,6 +230,14 @@ manager = Manager(
 manager.chat("Build a secure file-encryptor with AES-256 and unit tests.")
 ```
 
+#### Anthropic (Claude)
+```python
+from orionagent import Anthropic
+
+# Claude-backed orchestrator
+llm = Anthropic(model_name="claude-3-5-sonnet-20240620")
+```
+
 ### Example B: The Deterministic Knowledge Vault
 An agent designed for 100% accuracy in data extraction, syncing facts to a permanent database.
 

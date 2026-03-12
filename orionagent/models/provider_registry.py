@@ -35,6 +35,12 @@ def _register_builtins() -> None:
     except Exception:
         pass
 
+    try:
+        from orionagent.models.anthropic_provider import Anthropic
+        _PROVIDERS["anthropic"] = Anthropic
+    except Exception:
+        pass
+
 
 def register_provider(name: str, cls: Type[ModelProvider]) -> None:
     """Register a custom provider class under *name*."""
