@@ -20,18 +20,20 @@ class OpenAI(ModelProvider):
         streaming: bool = True,
         verbose: bool = False,
         debug: bool = False,
+        base_url: Optional[str] = None,
     ):
         super().__init__(token_count=token_count, streaming=streaming, verbose=verbose, debug=debug)
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self.model_name = model_name
         self.temperature = temperature
+        self.base_url = base_url or os.environ.get("OPENAI_BASE_URL", None)
 
         self.session_input_tokens = 0
         self.session_output_tokens = 0
         self.session_total_tokens = 0
 
         from openai import OpenAI
-        self._client = OpenAI(api_key=self.api_key)
+        self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
 
     def print_session_tokens(self) -> None:
