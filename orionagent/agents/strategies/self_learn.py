@@ -85,8 +85,8 @@ class SelfLearnStrategy(BaseStrategy):
             # Known-good pattern -- skip eval, zero extra tokens
             
             if stream:
-                return learned_agent.ask(task, stream=True, use_strategy=False, record_memory=False, temperature=temperature, hitl=hitl)
-            return learned_agent.ask(task, stream=False, use_strategy=False, record_memory=False, temperature=temperature, hitl=hitl)
+                return learned_agent.ask(task, stream=True, use_strategy=False, record_memory=False, temperature=temperature)
+            return learned_agent.ask(task, stream=False, use_strategy=False, record_memory=False, temperature=temperature)
 
         # Cold path -- execute + evaluate + learn
         if stream:
@@ -119,7 +119,7 @@ class SelfLearnStrategy(BaseStrategy):
         for attempt in range(self.max_refinements + 1):
             tried.add(selected.name)
             
-            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature, hitl=hitl)
+            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature)
             
             score, feedback = self._evaluate(original_task, response, model, system_instruction, context)
 
@@ -175,7 +175,7 @@ class SelfLearnStrategy(BaseStrategy):
 
         for attempt in range(self.max_refinements + 1):
             # Must collect full response for evaluation
-            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature, hitl=hitl)
+            response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature)
 
             score, feedback = self._evaluate(original_task, response, model, system_instruction, context)
 

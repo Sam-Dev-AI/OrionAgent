@@ -344,7 +344,8 @@ agent = Agent(name="Researcher", knowledge=kb)
 When an agent is initialized with `knowledge`, it automatically receives two high-performance tools:
 
 1.  **`ingest_file(file_path)`**: Automatically reads, chunks, and indexes a local file.
-2.  **`query_knowledge(query)`**: Performs a semantic search across the entire knowledge base and returns relevant snippets.
+2.  **`ingest_text(text)`**: Direct indexing of raw strings into the collection.
+3.  **`query_knowledge(query)`**: Performs a semantic search across the entire knowledge base and returns relevant snippets.
 
 ### C. Manual Ingestion vs. Tool-Based
 - **Manual**: Use `kb.ingest_file("data.pdf")` before starting the agent to "pre-load" its brain.
@@ -359,7 +360,9 @@ OrionAgent is engineered to solve the "abstraction tax" of other frameworks.
 ### "Clean Brain" Optimization
 - **Intelligent Pruning**: Once a session summary is created, the agent automatically trims the raw history to the last 6 messages. 
 - **Compact Headers**: Internal headers are minimized (e.g., `### LTM:`) to maximize the prompt space available for the agent's reasoning.
-- **Strategy Radar**: Simple conversational turns automatically bypass orchestration strategies, resulting in instant responses and 0 orchestration token cost.
+- **Strategy Radar (Threshold Logic)**:
+    - **Bypass**: Tasks $\leq$ 25 words without complexity keywords (e.g., "Hi", "How are you?") skip strategies for instant, zero-cost routing.
+    - **Trigger**: Tasks $>$ 25 words or containing keywords like `research`, `analyze`, `plan` trigger full orchestration.
 
 ---
 

@@ -4,7 +4,7 @@ from orionagent import Agent, Manager, OpenAI, HitlConfig, tool, MemoryConfig
 
 # 1. Configuration: OpenRouter with NVIDIA Nemotron
 MODEL_ID = "nvidia/nemotron-3-super-120b-a12b:free"
-API_KEY = "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"
+API_KEY = "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"
 BASE_URL = "https://openrouter.ai/api/v1"
 
 # Initialize Model with Token Counting enabled

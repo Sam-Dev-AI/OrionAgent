@@ -207,7 +207,16 @@ manager = Manager(
 | `medium` | Asks only for high-impact actions (Risk-based). |
 | `high` | Complete autonomy (Default if hitl=False). |
 
-### 4. High-Performance Execution Engine
+### 4. Smart Strategy Radar (Planning Threshold)
+OrionAgent uses a hybrid routing engine to balance intelligence and cost. Simple conversational tasks automatically bypass expensive orchestration.
+
+**Threshold Logic:**
+- **Mode 1: Bypass**: If task $\leq$ 25 words AND no complex keywords exist $\rightarrow$ Fast Direct Routing.
+- **Mode 2: Advanced**: If task $>$ 25 words OR contains complex keywords $\rightarrow$ Planning/Self-Learn Triggered.
+
+**Complexity Keywords**: `research`, `browser`, `analyze`, `compare`, `summary`, `outline`, `first`, `then`, `finally`, `steps`, `plan`, `extract`, `find all`.
+
+### 5. High-Performance Execution Engine
 OrionAgent is engineered for zero-latency. Control core performance variables directly:
 
 ```python
@@ -288,8 +297,9 @@ agent = Agent(
     knowledge="corporate_docs" # Creates a persistent index
 )
 
-# 1. Ingest content (Manual or via Chat)
+# 1. Ingest content (Manual, File, or Raw Text)
 agent.ask("Please read compliance_2024.pdf")
+agent.ask("Ingest this raw documentation: [Detailed Protocol Specs...]")
 
 # 2. Query it
 answer = agent.ask("What are the new security protocols for 2024?")

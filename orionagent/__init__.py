@@ -25,7 +25,7 @@ Usage -- multi-agent via Manager:
         print(chunk, end="", flush=True)
 """
 
-__version__ = "0.1.8"
+__version__ = "0.2.1"
 
 from orionagent.agents.base_agent import Agent
 from orionagent.agents.manager import Manager
@@ -44,6 +44,7 @@ from orionagent.agents.hitl import HitlConfig
 from orionagent.agents.guards import logic_guard, is_json, is_polite, contains_keywords, GUARD_REGISTRY
 from orionagent.tools.handoff_tool import trigger_handoff
 from orionagent.chat import chat
+from orionagent.knowledge.knowledge_base import KnowledgeBase
 
 # Import specific providers
 from orionagent.models.openai_provider import OpenAI
@@ -83,4 +84,5 @@ __all__ = [
     "default_tools",
     "chat",
     "tracer",
+    "KnowledgeBase",
 ]

@@ -7,7 +7,7 @@ from orionagent.knowledge.loaders.markdown_loader import MarkdownLoader
 class KnowledgeBase:
     """Manages a dedicated knowledge collection in ChromaDB."""
     
-    def __init__(self, persistence_path: str = "memory/chroma_db", collection_name: str = "orion_knowledge"):
+    def __init__(self, persistence_path: str = "orion_data/rag_db", collection_name: str = "orion_knowledge"):
         import chromadb
         self.client = chromadb.PersistentClient(path=persistence_path)
         self.collection = self.client.get_or_create_collection(name=collection_name)
@@ -50,6 +50,34 @@ class KnowledgeBase:
                 final_metas.append(chunk_meta)
                 final_ids.append(str(uuid.uuid4()))
                 
+        if final_docs:
+            self.collection.add(
+                documents=final_docs,
+                metadatas=final_metas,
+                ids=final_ids
+            )
+
+    def ingest_text(self, text: str, metadata: Optional[Dict[str, Any]] = None):
+        """Chunk and index raw text directly."""
+        if not text:
+            return
+            
+        final_docs = []
+        final_metas = []
+        final_ids = []
+        
+        meta = metadata or {}
+        meta["source"] = "raw_text_ingestion"
+        
+        chunks = self._chunk_text(text, chunk_size=1000, overlap=100)
+        
+        for i, chunk in enumerate(chunks):
+            chunk_meta = meta.copy()
+            chunk_meta["chunk"] = i
+            final_docs.append(chunk)
+            final_metas.append(chunk_meta)
+            final_ids.append(str(uuid.uuid4()))
+            
         if final_docs:
             self.collection.add(
                 documents=final_docs,
