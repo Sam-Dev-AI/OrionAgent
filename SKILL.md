@@ -159,6 +159,26 @@ The `Manager` uses strategies to handle complex goals. You can chain them: `stra
 - **When to use**: High-risk task execution (e.g. cloud deletion, sending emails, large purchases).
 - **Behavior**: An interactive terminal gate. The Manager will display its intended plan or delegation choice and wait for user input `(y/n)` before proceeding.
 
+**Advanced Configuration (`HitlConfig`):**
+```python
+from orionagent import Manager, HitlConfig
+
+# Configure safety levels
+safety_cfg = HitlConfig(
+    permission_level="medium",  # "low" (always), "medium" (risky), "high" (never)
+    ask_once=True,              # Approve once for the whole session turn
+    plan_review=True            # Show full decomposition before approval
+)
+
+manager = Manager(agents=[...], hitl=safety_cfg)
+```
+
+| Level | Name | Trigger Logic |
+| :--- | :--- | :--- |
+| **`low`** | Paranoiac | **Always** asks for approval for every goal or plan. |
+| **`medium`** | Balanced | Only asks if the task contains **risky keywords** (delete, run, terminal, etc.). |
+| **`high`** | Autonomous | **Never** asks. Complete trust. |
+
 ---
 
 ## 🚀 8. Large-Scale Engineering Examples

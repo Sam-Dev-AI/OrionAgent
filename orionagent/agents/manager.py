@@ -72,7 +72,7 @@ class Manager:
         verbose: bool = False,
         async_mode: bool = True,
         debug: bool = False,
-        hitl: bool = False,
+        hitl: Union[bool, "HitlConfig"] = False,
     ):
         self.name = name
         self._agents: List[Agent] = []
@@ -83,8 +83,14 @@ class Manager:
         # Inherit verbose and debug from model if not explicitly set
         self.verbose = verbose or (getattr(self._model, "verbose", False) if self._model else False)
         self.debug = debug or (getattr(self._model, "debug", False) if self._model else False)
+        from orionagent.agents.hitl import HitlConfig
         self.async_mode = async_mode
-        self.hitl = hitl
+        
+        # HITL Configuration
+        if isinstance(hitl, bool):
+            self.hitl = HitlConfig(permission_level="low" if hitl else "high")
+        else:
+            self.hitl = hitl
 
         
         # --- Memory setup (Same as Agent) ---

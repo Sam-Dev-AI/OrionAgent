@@ -187,7 +187,25 @@ manager = Manager(
 ```
 - **`planning`**: Decomposes a goal into a roadmap of parallel tasks.
 - **`self_learn`**: Executes the **Verdict Loop**—evaluating results and re-delegating with corrected context if quality fails.
-- **`hitl` (Safety Gate)**: When `True`, the Manager pauses and waits for terminal approval `(y/n)` before executing any plan or delegation.
+- **`hitl` (Safety Gate)**: When `True`, the Manager pauses for terminal approval `(y/n)`. 
+
+**Granular Safety Levels:**
+```python
+from orionagent import HitlConfig
+manager = Manager(
+    agents=[...],
+    hitl=HitlConfig(
+        permission_level="medium", # Ask only for risky tasks (delete, shell, etc.)
+        ask_once=True,             # Single approval for complex plans
+        plan_review=True           # Show full task breakdown
+    )
+)
+```
+| Level | Behavior |
+| :--- | :--- |
+| `low` | Always asks for approval (Default if hitl=True). |
+| `medium` | Asks only for high-impact actions (Risk-based). |
+| `high` | Complete autonomy (Default if hitl=False). |
 
 ### 4. High-Performance Execution Engine
 OrionAgent is engineered for zero-latency. Control core performance variables directly:

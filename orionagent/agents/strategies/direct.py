@@ -59,7 +59,10 @@ class DirectStrategy(BaseStrategy):
                 selected = agents[0]
 
         if hitl:
-            self._approve_direct(task, selected.name)
+            from orionagent.agents.hitl import HitlConfig
+            h_cfg = hitl if isinstance(hitl, HitlConfig) else HitlConfig()
+            if not self._approve_direct(task, selected.name, h_cfg):
+                raise InterruptedError("Delegation rejected by user via HITL.")
 
         if stream:
             return self._stream_response(selected, prompt, model, record_trace=record_trace, temperature=temperature)
@@ -67,16 +70,33 @@ class DirectStrategy(BaseStrategy):
         result = selected.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=record_trace, temperature=temperature)
         return result
 
-    def _approve_direct(self, task: str, agent_name: str):
+    def _approve_direct(self, task: str, agent_name: str, h_cfg: "HitlConfig") -> bool:
         """Interactive terminal approval for single delegation."""
+        if h_cfg.permission_level == "high":
+            return True
+            
+        if h_cfg.ask_once and h_cfg.is_session_authorized:
+            return True
+            
+        from orionagent.agents.hitl import is_risky_action
+        if h_cfg.permission_level == "medium":
+            if not is_risky_action(task):
+                return True
+
         print(f"\n\033[1m[ORION HITL] Delegation Approval Required\033[0m")
         print(f"Goal: {task}")
         print(f"Target Agent: {agent_name}")
         print("-" * 40)
         choice = input("Approve delegation? (y/n): ").strip().lower()
-        if choice != 'y':
+        if choice == 'y':
+            print("\033[32m[APPROVED] Executing...\033[0m")
+            if h_cfg.ask_once:
+                h_cfg.authorize_session()
+            return True
+        else:
             print("\033[31m[ABORTED] Delegation rejected by user.\033[0m")
-            raise InterruptedError("Delegation rejected by user via HITL.")
+            return False
+
         print("\033[32m[APPROVED] Executing...\033[0m\n")
 
 

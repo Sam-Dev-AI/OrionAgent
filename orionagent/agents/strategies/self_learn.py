@@ -65,7 +65,8 @@ class SelfLearnStrategy(BaseStrategy):
         verbose: bool = False,
         debug: bool = False,
         record_trace: bool = True,
-        hitl: bool = False,
+        hitl: Any = False,
+
     ) -> Union[str, Generator[str, None, None]]:
         # Fast bypass for simple conversational tasks
         if not self.is_complex_task(task):
@@ -104,7 +105,7 @@ class SelfLearnStrategy(BaseStrategy):
         system_instruction: Optional[str] = None,
         context: Optional[str] = None,
         temperature: Optional[float] = None,
-        hitl: bool = False,
+        hitl: Any = False,
     ) -> str:
         tried: Set[str] = set()
         selected = self.select_agent(task, agents)
@@ -162,7 +163,7 @@ class SelfLearnStrategy(BaseStrategy):
         system_instruction: Optional[str] = None,
         context: Optional[str] = None,
         temperature: Optional[float] = None,
-        hitl: bool = False,
+        hitl: Any = False,
     ) -> Generator[str, None, None]:
         tried: Set[str] = set()
         selected = self.select_agent(task, agents)

@@ -69,7 +69,11 @@ class PlanningStrategy(BaseStrategy):
 
         # HITL Approval Gate
         if hitl:
-            self._approve_plan(plan, task)
+            from orionagent.agents.hitl import HitlConfig
+            h_cfg = hitl if isinstance(hitl, HitlConfig) else HitlConfig()
+            if not self._approve_plan(plan, task, h_cfg):
+                raise InterruptedError("Plan rejected by user via HITL.")
+
 
         if stream:
             return self._stream_plan(plan, agents, task, model, async_mode, temperature=temperature)
@@ -213,22 +217,43 @@ class PlanningStrategy(BaseStrategy):
                     if is_final_group:
                         yield last_result
                         
-    def _approve_plan(self, plan: list, original_task: str):
+    def _approve_plan(self, plan: list, original_task: str, h_cfg: "HitlConfig") -> bool:
         """Interactive terminal approval for the generated plan."""
+        if h_cfg.permission_level == "high":
+            return True
+        
+        if h_cfg.ask_once and h_cfg.is_session_authorized:
+            return True
+        
+        from orionagent.agents.hitl import is_risky_action
+        if h_cfg.permission_level == "medium":
+            plan_str = str(plan)
+            if not is_risky_action(plan_str):
+                return True
+
         print(f"\n\033[1m[ORION HITL] Task Approval Required\033[0m")
         print(f"Goal: {original_task}")
         print("-" * 40)
         
-        for i, group in enumerate(plan, 1):
-            print(f"Group {i}:")
-            for step in group:
-                agent = step.get("a", step.get("agent", "Unknown"))
-                instr = step.get("s", step.get("step", ""))
-                print(f"  - [{agent}]: {instr}")
+        if h_cfg.plan_review:
+            for i, group in enumerate(plan, 1):
+                print(f"Group {i}:")
+                for step in group:
+                    agent = step.get("a", step.get("agent", "Unknown"))
+                    instr = step.get("s", step.get("step", ""))
+                    print(f"  - [{agent}]: {instr}")
+        else:
+            print("Plan Review disabled. High-level goal approval only.")
         
         print("-" * 40)
         choice = input("Approve plan? (y/n): ").strip().lower()
-        if choice != 'y':
+        if choice == 'y':
+            print("\033[32m[APPROVED] Executing...\033[0m")
+            if h_cfg.ask_once:
+                h_cfg.authorize_session()
+            return True
+        else:
             print("\033[31m[ABORTED] Plan rejected by user.\033[0m")
-            raise InterruptedError("Plan rejected by user via HITL.")
+            return False
+
         print("\033[32m[APPROVED] Executing plan...\033[0m\n")
