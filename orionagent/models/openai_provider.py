@@ -61,6 +61,34 @@ class OpenAI(ModelProvider):
         self.session_output_tokens += (usage.completion_tokens or 0)
         self.session_total_tokens += (usage.total_tokens or 0)
 
+    def _parse_rogue_tool_calls(self, content: str) -> List[dict]:
+        """Intercept XML-style tool calls (e.g. from Nemotron) and format as standard tool calls."""
+        if not content or "<tool_call>" not in content:
+            return []
+            
+        import re
+        # Format: <tool_call><function=name><parameter=key>val</parameter></function></tool_call>
+        calls = []
+        raw_calls = re.findall(r"<tool_call>(.*?)</tool_call>", content, re.DOTALL)
+        
+        for rc in raw_calls:
+            func_match = re.search(r"<function=(.*?)>", rc)
+            if not func_match: continue
+            name = func_match.group(1).strip()
+            
+            # Extract parameters
+            args = {}
+            params = re.findall(r"<parameter=(.*?)>(.*?)</parameter>", rc, re.DOTALL)
+            for k, v in params:
+                args[k.strip()] = v.strip()
+            
+            calls.append({
+                "id": f"rogue_{name[:10]}",
+                "type": "function",
+                "function": {"name": name, "arguments": json.dumps(args)}
+            })
+        return calls
+
     def generate(
         self,
         prompt: str,
@@ -108,16 +136,40 @@ class OpenAI(ModelProvider):
         if hasattr(response, "usage"):
             self._print_token_usage(response.usage)
 
+        if not response.choices:
+            return ""
+
         message = response.choices[0].message
-        if message.tool_calls:
+        
+        # INTERCEPT ROGUE TOOLS (Nemotron XML)
+        rogue_calls = self._parse_rogue_tool_calls(message.content or "")
+        
+        if message.tool_calls or rogue_calls:
             from orionagent.tools.tool_executor import ToolExecutor
             executor = ToolExecutor()
             
-            messages.append(message) # Add assistant tool call message to history
+            messages.append(message) # Add assistant message to history
             
-            for tool_call in message.tool_calls:
+            # Unify standard and rogue calls for execution
+            all_calls = []
+            if message.tool_calls:
+                all_calls.extend(message.tool_calls)
+            
+            for rc in rogue_calls:
+                # Mock tool_call object for the loop
+                class MockCall:
+                    def __init__(self, id, name, args):
+                        self.id = id
+                        self.function = type('obj', (object,), {'name': name, 'arguments': args})
+                all_calls.append(MockCall(rc["id"], rc["function"]["name"], rc["function"]["arguments"]))
+
+            for tool_call in all_calls:
                 name = tool_call.function.name
-                args = json.loads(tool_call.function.arguments)
+                try:
+                    args = json.loads(tool_call.function.arguments)
+                except:
+                    args = tool_call.function.arguments
+
                 res = executor.execute(name, args, tools)
                 
                 messages.append({
@@ -184,6 +236,7 @@ class OpenAI(ModelProvider):
         stream = self._client.chat.completions.create(**kwargs)
 
         full_tool_calls = {} # tool_call_id -> {name, args, type}
+        full_content = []
         
         for chunk in stream:
             # Capture usage if present (usually in the last chunk with stream_options)
@@ -207,9 +260,21 @@ class OpenAI(ModelProvider):
                         full_tool_calls[tc.index]["args"] += (tc.function.arguments or "")
             
             if delta.content:
+                full_content.append(delta.content)
                 yield delta.content
 
-        if full_tool_calls:
+        # INTERCEPT ROGUE TOOLS in accumulated history? 
+        # Actually in stream we yield chunks immediately. 
+        # For Nemotron, we'd need to collect the whole stream if we suspect tool calls.
+        # But our current stream loop yields immediately.
+        # FIX: We only intercept rogue calls if THEY WERE IN THE OUTPUT.
+        # But we already yielded them to the user.
+        # That's fine, we can still execute them and yield the final result.
+
+        # INTERCEPT ROGUE TOOLS in accumulated content
+        rogue_calls = self._parse_rogue_tool_calls("".join(full_content))
+
+        if full_tool_calls or rogue_calls:
             # End of stream, but we have tool calls to execute
             from orionagent.tools.tool_executor import ToolExecutor
             executor = ToolExecutor()
@@ -224,8 +289,12 @@ class OpenAI(ModelProvider):
                     "function": {"name": tc["name"], "arguments": tc["args"]}
                 })
             
-            messages.append({"role": "assistant", "tool_calls": tool_calls_payload})
+            for rc in rogue_calls:
+                tool_calls_payload.append(rc)
+            
+            messages.append({"role": "assistant", "content": "".join(full_content) or None, "tool_calls": tool_calls_payload})
 
+            # Execute standard tool calls
             for idx in sorted(full_tool_calls.keys()):
                 tc = full_tool_calls[idx]
                 name = tc["name"]
@@ -238,6 +307,19 @@ class OpenAI(ModelProvider):
                     "name": name,
                     "content": res,
                 })
+            
+            # Execute rogue tool calls
+            for rc in rogue_calls:
+                name = rc["function"]["name"]
+                args = json.loads(rc["function"]["arguments"])
+                res = executor.execute(name, args, tools)
+                
+                messages.append({
+                    "tool_call_id": rc["id"],
+                    "role": "tool",
+                    "name": name,
+                    "content": res,
+                })
 
             # Re-call generate_stream for final response
             final_stream = self._client.chat.completions.create(
@@ -246,5 +328,7 @@ class OpenAI(ModelProvider):
                 stream=True
             )
             for final_chunk in final_stream:
+                if not final_chunk.choices:
+                    continue
                 if final_chunk.choices[0].delta.content:
                     yield final_chunk.choices[0].delta.content
