@@ -45,7 +45,9 @@ class DirectStrategy(BaseStrategy):
             # Handled by the Manager level model
             if model:
                 if hitl:
-                    self._approve_direct(task, "Manager (Internal)")
+                    from orionagent.agents.hitl import HitlConfig
+                    h_cfg = hitl if isinstance(hitl, HitlConfig) else HitlConfig()
+                    self._approve_direct(task, "Manager (Internal)", h_cfg)
                 if stream:
                     return self._stream_manager(model, prompt, system_instruction, temperature, tools)
                 return model.generate(
