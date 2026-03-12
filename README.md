@@ -181,11 +181,13 @@ The `Manager` employs recursive strategy loops to decompose and execute complex 
 manager = Manager(
     agents=[researcher, analyst],
     strategy=["planning", "self_learn"], # Chain multiple strategies
-    max_refinements=2                    # Self-correction limit
+    max_refinements=2,                   # Self-correction limit
+    hitl=True                            # Enable Human-in-the-Loop Safety gate
 )
 ```
 - **`planning`**: Decomposes a goal into a roadmap of parallel tasks.
 - **`self_learn`**: Executes the **Verdict Loop**—evaluating results and re-delegating with corrected context if quality fails.
+- **`hitl` (Safety Gate)**: When `True`, the Manager pauses and waits for terminal approval `(y/n)` before executing any plan or delegation.
 
 ### 4. High-Performance Execution Engine
 OrionAgent is engineered for zero-latency. Control core performance variables directly:

@@ -155,6 +155,10 @@ The `Manager` uses strategies to handle complex goals. You can chain them: `stra
     3.  If quality fails, it provides feedback and **re-delegates** with corrected context.
     4.  Repeats up to `max_refinements`.
 
+### 4. `hitl` (Human-in-the-Loop)
+- **When to use**: High-risk task execution (e.g. cloud deletion, sending emails, large purchases).
+- **Behavior**: An interactive terminal gate. The Manager will display its intended plan or delegation choice and wait for user input `(y/n)` before proceeding.
+
 ---
 
 ## 🚀 8. Large-Scale Engineering Examples
