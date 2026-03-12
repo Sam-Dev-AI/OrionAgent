@@ -56,10 +56,9 @@ the_architect = Agent(
 the_librarian = Agent(
     name="TheLibrarian",
     role="Information Specialist & Knowledge Manager",
-    description="Manages the Knowledge Base, ingests documents, and retrieves semantic matches using ChromaDB.",
+    description="Manages the Knowledge Base, ingests documents, and retrieves semantic matches.",
     model=llm,
-    memory="chroma", # Enable SQLite + Chroma Vector Persistence
-    knowledge="assistant_master_knowledge",
+    memory="session",
     async_mode=True
 )
 
@@ -79,12 +78,13 @@ manager = Manager(
     agents=[omni, the_architect, the_librarian],
     strategy="planning", # Autonomous task decomposition
     model=llm,
+    memory="chroma", # Centralized Knowledge Base
+    knowledge="assistant_master_knowledge",
     hitl=HitlConfig(
         permission_level="high", # High autonomy: asks only for critical risks
         ask_once=True,           # Review planning stage only
         plan_review=True
     ),
-    verbose=False,
     debug=True # Industrial reasoning logs
 )
 

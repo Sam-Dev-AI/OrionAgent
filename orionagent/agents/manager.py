@@ -69,6 +69,7 @@ class Manager:
         max_refinements: int = 2,
         temperature: Optional[float] = None,
         tools: Optional[List[Any]] = None,
+        knowledge: Optional[str] = None,
         verbose: bool = False,
         async_mode: bool = True,
         debug: bool = False,
@@ -112,15 +113,29 @@ class Manager:
             
         import os
         self._session_manager = SessionManager(base_dir=self.memory_config.storage_path)
-        db_file = os.path.join(self.memory_config.storage_path, "orionagent.db")
-        self._persistent_db = SQLiteStorage(db_path=db_file) if self.memory_config.mode == "persistent" else None
+        
+        if self.memory_config.mode in ["persistent", "long_term", "chroma"]:
+            db_file = os.path.join(self.memory_config.storage_path, "orionagent.db")
+            use_vdb = (self.memory_config.mode == "chroma")
+            self._persistent_db = SQLiteStorage(db_path=db_file, use_chroma=use_vdb)
+        else:
+            self._persistent_db = None
+
         self._memory_pipeline = MemoryPipeline(self.memory_config, self._persistent_db)
         
-        if tools is None:
-            from orionagent.tools import default_tools
-            self.tools = default_tools
+        # --- Knowledge / RAG setup (Same as Agent) ---
+        from orionagent.knowledge.knowledge_base import KnowledgeBase
+        from orionagent.tools.rag_tools import IngestTool, QueryKnowledgeTool
+        
+        if isinstance(knowledge, str):
+            self.knowledge = KnowledgeBase(collection_name=knowledge)
         else:
-            self.tools = tools
+            self.knowledge = knowledge
+
+        self.tools = list(tools) if tools else []
+        if self.knowledge:
+            self.tools.append(IngestTool(self.knowledge))
+            self.tools.append(QueryKnowledgeTool(self.knowledge))
             
         self._strategy = get_strategy(
             strategy, max_refinements=max_refinements
