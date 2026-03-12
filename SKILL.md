@@ -113,6 +113,16 @@ Once you have `long_term` or `chroma` enabled, you can tune how deep the entity 
 
 **Pro Tip**: Use `chroma` mode for industrial knowledge bases (RAG) and `long_term` for simple user preferences.
 
+### C. The `MemoryConfig` Parameter Registry
+When building for an ecosystem, tune these for cost and precision:
+
+| Parameter | Type | Range | Description |
+| :--- | :--- | :--- | :--- |
+| **`priority`** | `str` | `low/med/high` | **Depth of Summary.** Higher depth means more detailed context window, but uses more tokens. |
+| **`extract_entities`**| `bool` | `True/False` | **Knowledge Extraction.** If True, agent identifies Names, Dates, and Facts for the JSON knowledge vault. |
+| **`importance_threshold`**| `int` | `1-10` | **Sync Filter.** Facts with importance below this are kept only in the session. 7+ is recommended for permanent storage. |
+| **`chunk_size`** | `int` | `5-50` | How many messages to wait before compressing history into a summary. |
+
 
 ---
 
@@ -178,6 +188,17 @@ manager = Manager(agents=[...], hitl=safety_cfg)
 | **`low`** | Paranoiac | **Always** asks for approval for every goal or plan. |
 | **`medium`** | Balanced | Only asks if the task contains **risky keywords** (delete, run, terminal, etc.). |
 | **`high`** | Autonomous | **Never** asks. Complete trust. |
+
+---
+
+### B. The `HitlConfig` Parameter Registry
+Control the "Safety Valve" of your orchestrator:
+
+| Parameter | Type | Values | Description |
+| :--- | :--- | :--- | :--- |
+| **`permission_level`**| `str` | `low/med/high` | The "Fear Factor". `medium` is best for general use (checks risk). |
+| **`ask_once`** | `bool` | `True/False` | **Session Honor.** If True, once you approve a goal, all sub-tasks in that plan execute without interruption. |
+| **`plan_review`** | `bool` | `True/False` | **Transparency.** If False, only the high-level goal is shown. If True, the full step-by-step plan is displayed. |
 
 ---
 

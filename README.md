@@ -308,15 +308,30 @@ Decoupled execution architecture for zero-latency orchestration.
 
 Managed through a **Dual-Tier Synchronizer**, OrionAgent maintains state across thousands of interactions without context saturation.
 
-### Data Synchronization Flow
+### Data Synchronization Flow (The Memory Engine)
 ```mermaid
 graph TD
-    A[User Signal] --> B[Memory Synchronizer]
-    B --> C[Session Buffer: Raw Turns]
-    B --> D[Background Summarizer]
-    D --> E[Persistent Tier: SQLite]
-    E -- Automatic Fact Injection --> F[Intelligence Hub]
-    C -- Sliding Window Injection --> F
+    User([User Signal]) --> Sync{Memory Synchronizer}
+    
+    subgraph Level 2: Session
+        Sync --> Buffer[Short-Term Buffer]
+    end
+    
+    subgraph Level 3: Long-Term
+        Sync --> Extract[Entity Extractor]
+        Extract --> SQL[(SQLite Knowledge Vault)]
+    end
+    
+    subgraph Level 4: Ultimate
+        Sync --> Embedding[Semantic Embedder]
+        Embedding --> Chroma[(Chroma Vector DB)]
+    end
+    
+    Buffer -- Recall --> Hub[Intelligence Hub]
+    SQL -- Structured Recall --> Hub
+    Chroma -- Semantic RAG Recall --> Hub
+    
+    Hub --> Agent[Agent Output]
 ```
 
 ### State Storage Metrics
