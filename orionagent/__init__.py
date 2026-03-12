@@ -40,6 +40,7 @@ from orionagent.memory import Session, MemoryConfig, JSONStorage, InMemoryStorag
 from orionagent import memory
 from orionagent.tracing import tracer
 from orionagent.agents.handoff import AgentHandoff
+from orionagent.agents.hitl import HitlConfig
 from orionagent.agents.guards import logic_guard, is_json, is_polite, contains_keywords, GUARD_REGISTRY
 from orionagent.tools.handoff_tool import trigger_handoff
 from orionagent.chat import chat
@@ -53,6 +54,7 @@ __all__ = [
     # Core APIs
     "Agent",
     "Manager",
+    "HitlConfig",
     "Tool",
     "tool",
     "file_manager",
