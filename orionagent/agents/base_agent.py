@@ -34,7 +34,7 @@ class Agent:
         tools:              List of Tool objects this agent can use.
         use_default_tools:  If True, auto-load all 5 built-in tools.
         model:              LLM provider instance.
-        memory:             Memory config string ("none", "session", "persistent") or dict.
+        memory:             Memory config string ("session", "long_term", "chroma") or dict. Defaults to "session".
         user_id:            User identifier for memory scoping.
         strategy:           Strategy name(s) for self-learning/planning.
         max_refinements:    Max retries for self-learn strategy.
@@ -49,7 +49,7 @@ class Agent:
         tools: Optional[List[Tool]] = None,
         use_default_tools: bool = False,
         model: Optional[Union[str, ModelProvider]] = None,
-        memory: Optional[Union[str, Dict[str, Any], MemoryConfig]] = None,
+        memory: Union[str, Dict[str, Any], MemoryConfig] = "session",
         user_id: str = "default_user",
         strategy: Optional[Union[str, List[str]]] = None,
         max_refinements: int = 2,
@@ -80,14 +80,11 @@ class Agent:
         # --- Memory setup ---
         if isinstance(memory, MemoryConfig):
             self.memory_config = memory
-        elif isinstance(memory, str):
-            self.memory_config = MemoryConfig(mode=memory)
         elif isinstance(memory, dict):
             self.memory_config = MemoryConfig.from_dict(memory)
-        elif memory is None:
-            self.memory_config = MemoryConfig(mode="session")
         else:
-            self.memory_config = MemoryConfig(mode="session")
+            # Treats strings and defaults (session) the same
+            self.memory_config = MemoryConfig(mode=memory)
             
         import os
         self._session_manager = SessionManager(base_dir=self.memory_config.storage_path)

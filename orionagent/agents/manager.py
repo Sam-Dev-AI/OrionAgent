@@ -30,7 +30,7 @@ Usage:
         print(chunk, end="", flush=True)
 """
 
-from typing import Generator, List, Optional, Union, Any
+from typing import Generator, List, Optional, Union, Any, Dict
 from orionagent.agents.base_agent import Agent
 from orionagent.models.base_provider import ModelProvider
 from orionagent.agents.strategies import get_strategy
@@ -55,6 +55,7 @@ class Manager:
                           to [web_browser] if not provided.
         max_refinements:  For self_learn: max retry attempts (default 2).
         system_instruction: Default instructions for the Manager's orchestrator model.
+        memory:           Memory level for the Manager's orchestrator. Defaults to "session".
     """
 
     def __init__(
@@ -63,7 +64,7 @@ class Manager:
         model: Optional[ModelProvider] = None,
         strategy: Optional[Union[str, List[str]]] = None,
         system_instruction: Optional[str] = None,
-        memory: Optional[Any] = None,
+        memory: Union[str, Dict[str, Any], "MemoryConfig"] = "session",
         agents: Optional[List[Agent]] = None,
         user_id: str = "default_user",
         max_refinements: int = 2,
@@ -102,14 +103,11 @@ class Manager:
         
         if isinstance(memory, MemoryConfig):
             self.memory_config = memory
-        elif isinstance(memory, str):
-            self.memory_config = MemoryConfig(mode=memory)
         elif isinstance(memory, dict):
             self.memory_config = MemoryConfig.from_dict(memory)
-        elif memory is None:
-            self.memory_config = MemoryConfig(mode="session")
         else:
-            self.memory_config = MemoryConfig(mode="session")
+            # Treats strings and defaults (session) the same
+            self.memory_config = MemoryConfig(mode=memory)
             
         import os
         self._session_manager = SessionManager(base_dir=self.memory_config.storage_path)

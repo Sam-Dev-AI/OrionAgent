@@ -96,7 +96,7 @@ Select the "Power Level" of your agent's memory based on your ecosystem needs:
 | Level | Mode | Behavior | Power |
 | :--- | :--- | :--- | :--- |
 | **1** | `none` | No memory. Static responses only. | Static |
-| **2** | `session` | Fast temporary conversation buffer. | Medium |
+| **2** | `session` | **Default.** Fast temporary conversation buffer. | Medium |
 | **3** | `long_term`| Session + Persistent SQLite (Structured Fact Recall). | High |
 | **4** | `chroma` | **Session + SQLite + Vector Knowledge (Semantic RAG).**| **Ultimate** |
 
