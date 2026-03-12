@@ -143,7 +143,7 @@ class MemoryPipeline:
             
         context_parts = []
         
-        # 1. Retrieve from Long-Term Memory (Persistent)
+        # 1. Retrieve from Long-Term Memory (Persistent) - Shortened header
         if self.config.mode == "persistent" and self.persistent_db:
             facts = self.persistent_db.search(
                 query=current_task,
@@ -153,35 +153,39 @@ class MemoryPipeline:
                 min_importance=self.config.importance_threshold
             )
             if facts:
-                context_parts.append("==== LONG-TERM MEMORY ====")
+                context_parts.append("### LTM:")
                 for f in facts:
                     context_parts.append(f"- {f['content']}")
                     
         # 2. Structured Entities/Facts (High priority)
         if self.config.extract_entities and session.entities:
-            context_parts.append("\n==== KNOWN FACTS & ENTITIES ====")
+            context_parts.append("\n### FACTS:")
             for name, data in session.entities.items():
                 cat = data.get("category", "General")
                 val = data.get("value", "")
                 context_parts.append(f"- [{cat}] {name}: {val}")
 
-        # 3. Session Summary
-        if session.session_summary:
-            context_parts.append("\n==== SESSION SUMMARY ====")
-            context_parts.append(session.session_summary)
-            
-        # 4. Chunk Summaries (Recent conversation history)
-        if session.chunk_summaries:
-            context_parts.append("\n==== RECENT CONVERSATION SUMMARY ====")
+        # 3. Session Summaries (Merged)
+        if session.session_summary or session.chunk_summaries:
+            context_parts.append("\n### RECAP:")
+            if session.session_summary:
+                context_parts.append(session.session_summary)
             for chunk in session.chunk_summaries:
                 context_parts.append(chunk)
                 
-        # 5. Working Memory (Recent Messages - Raw)
-        recent_messages = session.messages[-self.config.working_limit:]
+        # 4. Working Memory (Recent Messages - Raw)
+        # If we have summaries, we can reduce the working memory limit to save tokens
+        limit = self.config.working_limit
+        if session.session_summary or session.chunk_summaries:
+            limit = min(limit, 6) # Keep only the absolute latest dialogue if we have a recap
+
+        recent_messages = session.messages[-limit:]
         if recent_messages:
-            context_parts.append("\n==== WORKING MEMORY ====")
+            context_parts.append("\n### RECENT:")
             for msg in recent_messages:
-                context_parts.append(f"[{msg['role'].upper()}] {msg['content']}")
+                # Use single letter roles to save tokens
+                role_char = "U" if msg["role"] == "user" else "A"
+                context_parts.append(f"{role_char}: {msg['content']}")
                 
         return "\n".join(context_parts)
 

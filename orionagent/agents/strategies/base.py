@@ -109,14 +109,15 @@ class BaseStrategy:
         Bypasses planning and self-learning for simple conversational turns.
         """
         words = len(task.split())
-        if words > 15:
+        # Increase threshold to 25 words for planning/self-learn unless specific triggers found
+        if words > 25:
             return True
         
-        # Check for sequencing or complexity indicators
+        # Check for sequencing or complexity indicators - refined for multi-step intent
         complex_keywords = [
-            "and", "then", "after", "first", "finally", 
-            "research", "compare", "summary", "outline",
-            "plan", "steps", "find", "extract", "leads", "businesses"
+            "research", "browser", "analyze", "compare", "summary", "outline",
+            "first", "then", "finally", "steps", "plan",
+            "extract", "find all", "every", "multiple"
         ]
         task_lower = task.lower()
         if any(kw in task_lower for kw in complex_keywords):

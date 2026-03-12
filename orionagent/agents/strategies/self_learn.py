@@ -27,7 +27,7 @@ _EVAL_PROMPT = """Rate quality 1-5. If < 3, give ONE line feedback.
 Task: {task}
 Response: {response}
 
-Reply ONLY:
+Reply:
 SCORE: <#>
 FEEDBACK: <text>"""
 

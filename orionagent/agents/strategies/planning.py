@@ -16,13 +16,11 @@ from orionagent.agents.strategies.base import BaseStrategy
 from orionagent.models.base_provider import ModelProvider
 
 
-_PLANNING_PROMPT = """You are a task planner. Break the task into 1-4 steps.
-Available agents:
+_PLANNING_PROMPT = """Plan task into 1-4 steps. Agents:
 {agents}
 
-Reply ONLY with a JSON array of groups. Each group is an array of steps that can run in PARALLEL.
-Format: [[{{"s": "instruction", "a": "agent_name"}}, ...], [...]]
-IMPORTANT: If an agent has output constraints (e.g. 'straight' or 'short'), ensure the instruction 's' explicitly mentions these constraints to ensure compliance.
+Reply ONLY JSON: [[{{"s":"step","a":"agent"}},...],...] (Parallel groups in arrays)
+Constraints MUST be in 's'.
 
 Task: {task}"""
 
@@ -98,7 +96,7 @@ class PlanningStrategy(BaseStrategy):
         from orionagent.tracing import tracer
         tracer.log_event("plan", "Decomposing task into steps", task[:50], verbose=verbose, debug=debug)
         roster = "\n".join(
-            f"- {a.name} ({a.role}): {a.description}" for a in agents
+            f"- {a.name}: {a.role}" for a in agents
         )
         
         prompt_task = f"{context}\n\n==== CURRENT TASK ====\n{task}" if context else task
