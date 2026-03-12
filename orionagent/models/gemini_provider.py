@@ -180,6 +180,10 @@ class Gemini(ModelProvider):
 
         full_content = []
         for chunk in stream:
+            # Capture usage metadata
+            if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                self._print_token_usage(chunk.usage_metadata)
+
             # Check for function calls in any part of the candidate
             has_function_call = any(part.function_call for part in chunk.candidates[0].content.parts)
             if has_function_call:

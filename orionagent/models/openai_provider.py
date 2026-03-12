@@ -172,6 +172,7 @@ class OpenAI(ModelProvider):
             "model": self.model_name,
             "messages": messages,
             "stream": True,
+            "stream_options": {"include_usage": True}
         }
         if temp is not None:
             kwargs["temperature"] = temp
@@ -185,6 +186,13 @@ class OpenAI(ModelProvider):
         full_tool_calls = {} # tool_call_id -> {name, args, type}
         
         for chunk in stream:
+            # Capture usage if present (usually in the last chunk with stream_options)
+            if hasattr(chunk, "usage") and chunk.usage:
+                self._print_token_usage(chunk.usage)
+
+            if not chunk.choices:
+                continue
+
             delta = chunk.choices[0].delta
             
             if delta.tool_calls:
