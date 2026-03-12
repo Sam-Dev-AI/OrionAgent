@@ -14,7 +14,7 @@
 
 <br />
 
-**OrionAgent is built for performance. It eliminates the abstraction tax of modern agent frameworks, providing a low-latency, high-control environment for mission-critical AI applications.**
+**OrionAgent is built for performance. Efficient by design, it minimizes the "abstraction tax" with Clean Brain optimization, reducing token overhead by up to 50%.**
 
 [Quick Start](#quick-start) &nbsp;&bull;&nbsp; [Master Skill Guide](SKILL.md) &nbsp;&bull;&nbsp; [Core Configuration](#core-configuration--api-reference) &nbsp;&bull;&nbsp; [Architecture](#architecture-blueprints) &nbsp;&bull;&nbsp; [Memory Tier](#memory-architecture--patterns) &nbsp;&bull;&nbsp; [OrionAgent vs Others](#orionagent-vs-langchain--autogen)
 
@@ -35,7 +35,7 @@ Whether you are building complex research swarms or precision-driven automation 
 
 ## Philosophy
 
-OrionAgent is designed to eliminate the **black box** complexity of modern agent frameworks. It provides a low-abstraction, high-control environment for building agents that are **token-efficient**, **persistent by default**, and **deterministic** via logic guards.
+OrionAgent is designed to eliminate the **black box** complexity of modern agent frameworks. It provides a low-abstraction, high-control environment for building agents that are **token-efficient** (via Clean Brain context pruning), **persistent by default**, and **deterministic** via logic guards.
 
 ---
 
