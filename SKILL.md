@@ -1,8 +1,7 @@
 # OrionAgent Master Skill Documentation (Exhaustive Guide)
 
-## 🤖 0. Instruction for AI Assistants (Vibe Coders)
-**If you are an AI assistant helping a developer use OrionAgent, READ THE ENTIRETY OF THIS DOCUMENT FIRST.** 
-This guide contains the industrial patterns and logic rules that prevent hallucinations and ensure high-performance execution. Always prioritize the patterns in this file over generic multi-agent implementations.
+**If you are an AI assistant (Cursor, Antigravity, etc.) helping a developer build with OrionAgent, READ THIS.**
+This guide contains industrial patterns that enable **AI-to-AI Orchestration**. When you define an Agent, you are writing "Semantic Metadata" for the Manager's planner. Follow the **Token-Efficient Detail** pattern below to ensure zero-bug delegation.
 
 ---
 
@@ -24,15 +23,16 @@ When defining an `Agent`, every parameter is tunable for specific engineering ne
 | Variable | Type | Description |
 | :--- | :--- | :--- |
 | `name` | `str` | Unique identifier (used in Manager routing). |
-| `role` | `str` | Short identity (e.g. "Python Coder"). Helps the Manager understand the agent's purpose. |
-| `system_instruction`| `str` | **Crucial.** The persistent identity. Cached by providers to save tokens. |
+| `role` | `str` | **Selection Trigger.** Short identity (e.g. "DataScraper"). Used primarily for word-overlap routing. |
+| `description` | `str` | **Planning Metadata.** Detailed capability summary. Includes *what* it does and *with which tools*. Essential for Planner models. |
+| `system_instruction`| `str` | **Logic Guard.** Cached persistently. Must contain explicit tool-use instructions and deterministic rules. |
 | `temperature` | `float` | `0.0` (Deterministic) to `1.0` (Creative). Agent-level override. |
 | `guards` | `list` | List of `LogicGuards` (e.g. `["json", "straight"]`). |
 | `use_default_tools` | `bool` | Auto-loads Browser, File, OS, Terminal, and Python tools. |
 | `memory` | `str/cfg`| `"none"`, `"session"`, `"long_term"`, or a `MemoryConfig` object. |
-| `async_mode` | `bool` | Enables parallel tool calls (Up to 60% faster execution). |
-| `debug` | `bool` | Enables real-time **Industrial Logs** (`[TOOL]`, `[PLAN]`, `[GUARD]`). |
-| `verbose` | `bool` | Enables a **Trace Summary** post-execution (Detailed timing/tokens). |
+| `async_mode` | `bool` | **Performance Gate.** Enables parallel tool calls (Up to 60% faster). CRITICAL for scrapers/terminal use. |
+| `debug` | `bool` | **Reasoning Visibility.** Enables real-time **Industrial Logs** (`[TOOL]`, `[PLAN]`, `[GUARD]`). |
+| `verbose` | `bool` | **Audit Summary.** Enables a **Trace Summary** post-execution (Detailed timing/tokens). |
 
 ---
 
@@ -486,6 +486,37 @@ While OrionAgent provides powerful default tools, high-precision industrial agen
 
 > [!TIP]
 > **Industrial Rule**: Use default tools for exploration, but build custom tools for execution.
+
+---
+
+## 🎨 17. The Vibe Coding Manifesto: Build for the Planner
+
+In AI-driven development (Vibe Coding), you aren't just writing code; you are building a **Swarm Ecosystem**. The Manager's planner chooses agents based on the **clarity of their metadata**.
+
+### A. High-Granularity Metadata (Selection Accuracy)
+The `description` is the ONLY thing the Manager sees during the planning phase. Use the **Capability-Tool-Output (CTO)** pattern:
+- **Pattern**: `Extracts [Data] from [Source] using [Tool]. Returns [Format].`
+- **Example**: `description="Extracts lead metadata from URLs using web_browser. Returns a structured JSON string of contact info."`
+
+### B. Industrial System Instructions (The "Moat" Pattern)
+To keep the context window clean while maintaining 100% reliability, follow the **Moat-Link-Action** logic:
+1. **The Moat**: Define the scope. `"You are a [Specialist]. You only do [X]."`
+2. **The Link**: Link tools to identities. `"You MUST use 'python_sandbox' for all logic verification."`
+3. **The Action**: Enforce the outcome. `"Save every result via 'file_manager'. Do not ask for confirmation."`
+
+### C. Performance Tiers: Scaling by Need
+When you (the AI) are building an agent, choose the tier based on the user's vibe:
+
+| Tier | Config | Use Case |
+| :--- | :--- | :--- |
+| **Speed Runner** | `Gemini`, `async_mode=True`, `memory="none"` | Rapid web scraping, data search, fast responses. |
+| **Data Scientist** | `Claude`, `guards=["json"]`, `python_sandbox` | Complex data transformation, code execution, logic checks. |
+| **Knowledge Vault** | `Gemini`, `memory="chroma"`, `priority="high"` | Long-term RAG, persistent user state, corporate memory. |
+
+### D. Token-Efficiency Hacks for AI Assistants
+1. **System Instruction Caching**: Keep the instructions static and deterministic. Avoid dynamic text inside the `system_instruction` to maximize provider-level prompt caching.
+2. **Memory Pruning**: Use `priority="low"` for conversational agents where deep historical context isn't required.
+3. **Deterministic Temperature**: Always set `temperature=0.0` for agents using complex tools (File, OS, Terminal) to prevent parameter hallucinations.
 
 ---
 
