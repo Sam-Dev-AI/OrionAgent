@@ -56,6 +56,7 @@ class Manager:
         max_refinements:  For self_learn: max retry attempts (default 2).
         system_instruction: Default instructions for the Manager's orchestrator model.
         memory:           Memory level for the Manager's orchestrator. Defaults to "session".
+        use_default_tools: If True, auto-load all built-in tools.
     """
 
     def __init__(
@@ -70,6 +71,7 @@ class Manager:
         max_refinements: int = 2,
         temperature: Optional[float] = None,
         tools: Optional[List[Any]] = None,
+        use_default_tools: bool = False,
         knowledge: Optional[str] = None,
         verbose: bool = False,
         async_mode: bool = True,
@@ -131,6 +133,9 @@ class Manager:
             self.knowledge = knowledge
 
         self.tools = list(tools) if tools else []
+        if use_default_tools:
+            self._merge_default_tools()
+
         if self.knowledge:
             self.tools.append(IngestTool(self.knowledge))
             self.tools.append(QueryKnowledgeTool(self.knowledge))
@@ -148,6 +153,15 @@ class Manager:
     def agents(self) -> List[Agent]:
         """Returns the list of agents registered with this manager."""
         return self._agents
+
+    def _merge_default_tools(self):
+        """Merge built-in tools, skipping any already present by name."""
+        from orionagent.tools import default_tools
+
+        existing_names = {t.name for t in self.tools}
+        for dt in default_tools:
+            if dt.name not in existing_names:
+                self.tools.append(dt)
 
     # ------------------------------------------------------------------
     # Agent registration
@@ -182,6 +196,7 @@ class Manager:
         task: str,
         stream: bool = True,
         session_id: Optional[str] = None,
+        priority: Optional[str] = None,
         record_memory: bool = True,
         record_trace: bool = True,
         temperature: Optional[float] = None,
@@ -194,25 +209,46 @@ class Manager:
         if record_trace:
             trace_id = tracer.start_trace("manager_ask", self.name, task, verbose=self.verbose, debug=self.debug)
 
-        if not self._agents:
-            error = "Error: No agents added to the manager."
+        if not self._agents and not self.tools:
+            error = "Error: No agents or tools added to the manager."
             if record_trace:
                 tracer.end_trace(trace_id, error)
             return (x for x in [error]) if stream else error
 
+        # If no agents, create a proxy so the Manager can handle tasks via Strategy
+        execution_agents = self._agents
+        if not execution_agents:
+            from orionagent.agents.base_agent import Agent
+            manager_proxy = Agent(
+                name=self.name,
+                role="Manager",
+                description="The primary orchestrator.",
+                model=self._model,
+                tools=self.tools,
+                use_default_tools=False,
+                system_instruction=self.system_instruction,
+                memory="session",
+                verbose=self.verbose,
+                debug=self.debug
+            )
+            execution_agents = [manager_proxy]
+
         context = None
-        sid = self._session_manager.auto(self.user_id, "Manager")
+        sid = session_id or self._session_manager.auto(self.user_id, "Manager")
         session = self._session_manager.load(self.user_id, "Manager", sid)
         if not session:
             from orionagent.memory.session import Session
             session = Session(self.user_id, "Manager", sid)
+        
+        if priority:
+            session.priority = priority
 
         if self.memory_config.mode != "none":
             self._memory_pipeline.process_turn(session, "user", task, self._model)
             context = self._memory_pipeline.build_context(session, current_task=task)
 
         # Enrich system instruction with agent roster
-        agent_roster = "\n".join([f"- {a.name}: {a.role}. {a.description}" for a in self._agents])
+        agent_roster = "\n".join([f"- {a.name}: {a.role}. {a.description}" for a in execution_agents])
         enriched_instruction = (
             f"{self.system_instruction}\n\n"
             f"You have access to the following agents:\n{agent_roster}\n\n"
@@ -223,7 +259,7 @@ class Manager:
 
         result = self._strategy.execute(
             task=task,
-            agents=self._agents,
+            agents=execution_agents,
             model=self._model,
             system_instruction=enriched_instruction,
             context=context,
@@ -235,13 +271,14 @@ class Manager:
             debug=self.debug,
             record_trace=False,
             hitl=self.hitl,
+            priority=priority,
         )
 
         
         # Handle Handoff objects (Direct Return)
         if isinstance(result, AgentHandoff):
             tracer.log_event("handoff_detected", result.target_agent, result.task, metadata={"source": result.source_agent})
-            target = next((a for a in self._agents if a.name == result.target_agent), None)
+            target = next((a for a in execution_agents if a.name == result.target_agent), None)
             if target:
                 final_res = target.ask(result.to_prompt(), stream=stream, record_trace=False)
                 if trace_id:

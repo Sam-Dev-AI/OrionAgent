@@ -3,12 +3,23 @@ from orionagent.tools.decorator import tool
 
 
 @tool
-def execute_python(code: str) -> str:
-    """Runs a snippet of python code in an isolated subprocess and returns stdout/stderr.
-    Use this strictly for complex execution or dynamic problem solving.
+def python_sandbox(code: str) -> str:
+    """A Dynamic Reasoning Engine for executing complex Python logic in a secure sandbox.
+    Use this for tasks that require algorithmic thinking, data processing, or simulation.
+
+    When to use:
+    - solving complex math (e.g., n-th prime, matrix operations).
+    - manipulating large text blocks or JSON data dynamically.
+    - writing and running temporary scripts to verify a hypothesis.
+
+    Example Code:
+    ```python
+    def is_prime(n): ...
+    print([x for x in range(2, 100) if is_prime(x)])
+    ```
 
     Args:
-        code (str): The valid python code to execute.
+        code: The complete, valid Python 3 code snippet to execute. Use print() for output.
     """
     try:
         result = subprocess.run(

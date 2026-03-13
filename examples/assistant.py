@@ -1,83 +1,131 @@
-import os
-import psutil # Ensure psutil is installed for 'real powerful' tools
-from orionagent import Agent, Manager, OpenAI, HitlConfig, tool, MemoryConfig
+import csv
+import traceback
+from typing import List, Dict
+from orionagent import Agent, Manager, Gemini, HitlConfig, tool, MemoryConfig, web_browser
 
-# 1. Configuration: OpenRouter with NVIDIA Nemotron
-MODEL_ID = "nvidia/nemotron-3-super-120b-a12b:free"
-API_KEY = "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"
-BASE_URL = "https://openrouter.ai/api/v1"
+# 1. Configuration: Model Setup
+MODEL_ID = "gemini-2.0-flash"
+API_KEY = "YOUR_API_KEY"
 
-# Initialize Model with Token Counting enabled
-llm = OpenAI(
+# Initialize Gemini Model
+llm = Gemini(
     model_name=MODEL_ID, 
     api_key=API_KEY, 
-    base_url=BASE_URL, 
     token_count=True,
     temperature=0.4
 )
 
-# 2. Real Powerful Custom Tools
 @tool
-def get_system_health():
-    """Returns a real-time 'Industrial' view of system CPU, Memory, and Disk health.
-    Useful for system diagnostics and root-level monitoring.
+def discover_businesses(query: str):
+    """Searches the web for business information based on a query. 
+    Use this to find names, websites, or contact pages.
+
+    Args:
+        query: The search query to find businesses.
     """
-    cpu = psutil.cpu_percent(interval=1)
-    mem = psutil.virtual_memory().percent
-    disk = psutil.disk_usage('/').percent
-    return f"STATUS: CPU: {cpu}% | RAM: {mem}% | DISK: {disk}%"
+    # Robust enhancement: Ensure location context is preserved
+    clean_query = query if "list" in query.lower() or "directory" in query.lower() else f"{query} list directory"
+    results = web_browser(action="search", query_or_url=clean_query)
+    return f"Web discovery for '{query}':\n{results}"
 
 @tool
-def deep_file_search(pattern: str, search_path: str = "."):
-    """Performs a recursive deep search for files matching a pattern.
-    Used for locating critical configuration or log files across the system.
+def get_contact_info(business_name: str, location: str):
+    """Specific search for phone numbers and contact details of a business.
+
+    Args:
+        business_name: The name of the business to search for.
+        location: The city or region of the business.
     """
-    matches = []
-    for root, dirnames, filenames in os.walk(search_path):
-        for filename in filenames:
-            if pattern in filename:
-                matches.append(os.path.join(root, filename))
-    return f"FOUND {len(matches)} files: {matches[:10]}"
+    search_query = f"{business_name} {location} phone number contact official website"
+    results = web_browser(action="search", query_or_url=search_query)
+    return f"Contact extraction for {business_name} in {location}:\n{results}"
+
+@tool
+def save_leads_to_csv(leads: List[Dict], filename: str):
+    """Saves a list of leads (dictionaries) to a CSV file.
+    
+    Args:
+        leads: A list of dictionaries where each dict represents a lead (e.g., [{'name': 'Hotel A', 'phone': '123'}]).
+        filename: The target filename (e.g., 'mumbai_leads.csv').
+    """
+    if not leads:
+        return "Error: No leads provided to save."
+    
+    try:
+        # Ensure filename ends with .csv
+        if not filename.endswith(".csv"):
+            filename += ".csv"
+            
+        keys = leads[0].keys()
+        with open(filename, 'w', newline='', encoding='utf-8') as output_file:
+            dict_writer = csv.DictWriter(output_file, fieldnames=keys)
+            dict_writer.writeheader()
+            dict_writer.writerows(leads)
+        return f"Successfully saved {len(leads)} leads to {filename}"
+    except Exception as e:
+        return f"Failed to save CSV: {str(e)}"
 
 # 3. Dedicated Specialized Agents
-# The Architect: Focuses on System Ops, Terminal, and Infrastructure
-the_architect = Agent(
-    name="TheArchitect",
-    role="System Administrator & Infrastructure Engineer",
-    description="Handles terminal execution, shell commands, and system diagnostics with root-level access.",
+the_researcher = Agent(
+    name="TheResearcher",
+    role="Researcher",
+    description="Finds business information and leads. Use 'discover_businesses'.",
     model=llm,
-    use_default_tools=True, # Built-in Shell/Terminal/Files
-    tools=[get_system_health, deep_file_search],
+    system_instruction="""You are an industrial researcher. 
+MANDATORY: You MUST use 'discover_businesses' for every lead discovery task.
+DO NOT ASK for confirmation. DO NOT summarize only. 
+Output the raw findings including names and estimated locations.""",
+    use_default_tools=False,
+    tools=[discover_businesses],
     async_mode=True,
     verbose=True
 )
 
-# The Librarian: Focuses on Knowledge, RAG, and semantic context
-the_librarian = Agent(
-    name="TheLibrarian",
-    role="Information Specialist & Knowledge Manager",
-    description="Manages the Knowledge Base, ingests documents, and retrieves semantic matches.",
+the_scraper = Agent(
+    name="TheScraper",
+    role="Scraper",
+    description="Gets contact details for businesses. Use 'get_contact_info'.",
     model=llm,
-    memory="session",
-    async_mode=True
+    system_instruction="""You are an industrial scraper. 
+MANDATORY: For every business name provided, you MUST call 'get_contact_info'.
+DO NOT ASK for confirmation. Return phone numbers and official website links if found.
+Process ALL businesses provided in your data context.""",
+    use_default_tools=False,
+    tools=[get_contact_info],
+    async_mode=True,
+    verbose=True
 )
 
-# Omni: The generalist 'Chief of Staff' who helps with everything
 omni = Agent(
     name="Omni",
-    role="Strategic General Assistant",
-    description="A versatile assistant capable of handling creative tasks, scheduling, and general problem solving.",
+    role="Lead Manager",
+    description="Aggregates results and saves them to files. Use 'save_leads_to_csv'.",
     model=llm,
+    system_instruction="""You are the Lead Master. 
+Your final task is to take all findings from previous steps, format them as a list of dictionaries, and call 'save_leads_to_csv'.
+DO NOT ASK if you should save—EXECUTE it. The filename must be what the user requested or a descriptive one.""",
     memory="session",
+    tools=[save_leads_to_csv],
     async_mode=True
 )
 
 # 4. Multi-Agent Manager: The Orchestrator
-# Uses planning strategy to decompose tasks and high-permission HITL for safety.
+# Uses planning strategy to decompose tasks.
 manager = Manager(
-    agents=[omni, the_architect, the_librarian],
-    strategy="planning", # Autonomous task decomposition
     model=llm,
+    agents=[the_researcher, the_scraper, omni],
+    strategy="planning", # Autonomous task decomposition
+    system_instruction="""You are Orion, the Lead Master Orchestrator. 
+Your mission is to coordinate a technical swarm to discover and verify high-quality business leads.
+
+AGENT PROTOCOL:
+- Delegate broad discovery (finding names/lists) to 'TheResearcher'.
+- Delegate detailed extraction (phone numbers, addresses) to 'TheScraper'.
+- Delegate final consolidation and file creation (CSV saving) to 'Omni'.
+
+REASONING ENGINE:
+- You are an INDUSTRIAL system. Never ask if you should do something—PLAN IT and EXECUTE IT.
+- If a user asks for leads, your default path is: Discover -> Scrape -> Save -> Report.""",
     memory="chroma", # Centralized Knowledge Base
     knowledge="assistant_master_knowledge",
     hitl=HitlConfig(
@@ -85,7 +133,8 @@ manager = Manager(
         ask_once=True,           # Review planning stage only
         plan_review=True
     ),
-    debug=True # Industrial reasoning logs
+    debug=True, # Industrial reasoning logs
+    verbose=True # See agent steps
 )
 
 def run_assistant():
@@ -115,4 +164,7 @@ def run_assistant():
             print(f"\nERROR: {str(e)}")
 
 if __name__ == "__main__":
-    run_assistant()
+    try:
+        run_assistant()
+    except Exception:
+        traceback.print_exc()

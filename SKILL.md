@@ -366,4 +366,127 @@ OrionAgent is engineered to solve the "abstraction tax" of other frameworks.
 
 ---
 
+## 🛠️ 13. Tool Engineering (Best Practices)
+
+To ensure high-performance tool usage and prevent "Tool not found" or "Unavailable" refusals, follow these industrial patterns:
+
+### A. The Perfect Tool Definition
+Every custom tool MUST use the `@tool` decorator and a **Google-style docstring**.
+
+```python
+@tool
+def my_custom_tool(param1: str, param2: int = 10):
+    """
+    Detailed description of what the tool does.
+    (This is sent to the LLM to explain the tool's purpose).
+
+    Args:
+        param1: Description of the first parameter.
+        param2: Description of the second parameter.
+    """
+    # Logic here
+    return f"Result: {param1}"
+```
+
+### B. High-Performance Patterns
+1.  **Strict Type Hints**: Always use `str`, `int`, `float`, or `bool`. These are automatically converted to JSON Schema.
+2.  **Args Section**: The `Args:` section is **mandatory** for complex tools. Without it, the LLM will see parameters but won't know what values to pass.
+3.  **Functional Callability**: OrionAgent tools are **callable**. This means you can call one tool inside another safely:
+    ```python
+    @tool
+    def search_and_analyze(query: str):
+        # web_browser is a @tool, but we call it like a function
+        raw_data = web_browser(action="search", query_or_url=query)
+        return analyze_text(raw_data)
+    ```
+4.  **Error Handling**: If a tool fails, return a string starting with `Error:`. The Agent will see this and attempt to fix its input.
+
+---
+
+## 🐍 14. The Python Sandbox (Dynamic Reasoning)
+
+The `python_sandbox` is a first-class tool for industrial agents to verify logic, process data, and solve algorithmic challenges.
+
+### A. When to Use
+- **Deterministic Math**: Use when the LLM's internal math might be unreliable (e.g., complex interest, factorials, statistics).
+- **Data Transformation**: Use for parsing complex JSON, cleaning text, or restructuring large datasets.
+- **Hypothesis Testing**: Use to verify if a proposed solution (like a regex or algorithm) actually works before committing to it.
+
+### B. The "Ghost Script" Pattern
+The sandbox operates on a **Zero-Footprint** principle:
+1. **Execution**: Code is passed via a `-c` flag to a temporary Python subprocess.
+2. **Persistence**: No `.py` files are created or saved to the disk.
+3. **RAM Only**: Everything runs in volatile memory and vanishes once the tool returns the output.
+
+### C. Industrial Requirements
+- **Output via `print()`**: The agent ONLY sees what is explicitly printed to stdout.
+- **Self-Contained**: The sandbox starts a fresh environment. If you need local variables, they must be defined within the script or passed as strings.
+- **Error Propagation**: Subprocess errors (SyntaxError, ZeroDivisionError) are returned as strings starting with `Error:`.
+
+```python
+# Industrial Example: Calculating Fibonacci securely
+@tool
+def heavy_calculation(n: int):
+    # This logic is delegated to the sandbox for 100% accuracy
+    code = f"""
+def fib(n):
+    a, b = 0, 1
+    for _ in range(n):
+        yield a
+        a, b = b, a + b
+print(list(fib({n})))
+    """
+    return python_sandbox(code=code)
+```
+
+---
+
+## 🤖 15. Industrial Persona Engineering
+
+To ensure agents execute reliably without asking clarifying questions, their `system_instruction` must be engineered with explicit tool and agent awareness.
+
+### A. Agent-Level Instructions (Self-Awareness)
+Every agent should know exactly which tools it owns and when to trigger them.
+- **Rule**: Mention the tool names explicitly in the system instruction.
+- **Pattern**: "You are [Role]. You MUST use '[tool_name]' for [specific task]. Do not summarize findings without executing the tool."
+
+**Example**:
+```python
+system_instruction="You are a Researcher. Use 'web_search' to find business names. DO NOT ask for permission; find the data and return it."
+```
+
+### B. Manager-Level Instructions (Orchestration)
+The Manager must understand its identity as a leader and the capabilities of its swarm.
+- **Identity**: Clearly state: "You are the Orchestrator/Manager."
+- **Delegation**: List the agents available and what they are best for.
+- **Task Protocol**: Define the "Industrial Path" (e.g., "Research -> Scrape -> Save").
+
+**Example**:
+```python
+system_instruction="""You are the Lead Manager. 
+You coordinate 'TheResearcher' (for discovery) and 'TheScraper' (for extraction). 
+Your goal is to ensure a complete data loop: Discover, Extract, and Save."""
+```
+
+---
+
+## 🛠️ 16. Custom Tool Primacy (The Vibe Coder Path)
+
+While OrionAgent provides powerful default tools, high-precision industrial agents should prioritize **Custom Tools** built for specific tasks. This is the core of "Vibe Coding"—Human and AI collaborating to build the perfect toolkit.
+
+### A. Why Custom Tools Beat Defaults
+- **Precision**: A generic `web_browser` returns raw HTML; a custom `scrape_lead_details` tool returns a structured list of emails.
+- **Safety**: A custom `save_leads_to_csv` tool has built-in validation, whereas a generic `execute_command` can be dangerous.
+- **Consistency**: Hardcoding logic into a tool (e.g., formatting data) is 100% deterministic, whereas asking an LLM to format it is only 95% reliable.
+
+### B. The "Vibe Coder" Strategy
+1. **Identify the Gap**: If you see an agent struggling to format data or find specific info, don't just change the prompt.
+2. **Build the Bridge**: Write a small `@tool` that handles the heavy lifting (math, file I/O, API calls).
+3. **Empower the Agent**: Give that tool to the agent. Now the agent's complexity goes down, and its reliability goes to 100%.
+
+> [!TIP]
+> **Industrial Rule**: Use default tools for exploration, but build custom tools for execution.
+
+---
+
 **OrionAgent: Build Agents That Actually Work.**

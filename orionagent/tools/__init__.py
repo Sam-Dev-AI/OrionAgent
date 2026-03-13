@@ -4,7 +4,7 @@ from orionagent.tools.decorator import tool
 from orionagent.tools.file_manager import file_manager, FileAction
 from orionagent.tools.web_browser import web_browser, WebAction
 from orionagent.tools.system_tools import system_tools, SysAction
-from orionagent.tools.python_sandbox import execute_python
+from orionagent.tools.python_sandbox import python_sandbox
 from orionagent.tools.terminal import execute_command
 from orionagent.tools.memory_tools import SaveMemoryTool, SearchMemoryTool
 
@@ -13,7 +13,7 @@ default_tools = [
     web_browser,
     file_manager,
     system_tools,
-    execute_python,
+    python_sandbox,
     execute_command,
 ]
 
@@ -27,7 +27,7 @@ __all__ = [
     "WebAction",
     "system_tools",
     "SysAction",
-    "execute_python",
+    "python_sandbox",
     "execute_command",
     "SaveMemoryTool",
     "SearchMemoryTool",

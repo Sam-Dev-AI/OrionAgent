@@ -117,6 +117,9 @@ class Gemini(ModelProvider):
         self._print_token_usage(response.usage_metadata)
 
         # Handle tool calls
+        if not response.candidates or not response.candidates[0].content or not response.candidates[0].content.parts:
+            return response.text or ""
+
         has_function_call = any(part.function_call for part in response.candidates[0].content.parts)
         if has_function_call:
             from orionagent.tools.tool_executor import ToolExecutor
@@ -152,9 +155,9 @@ class Gemini(ModelProvider):
                 config=config,
             )
             self._print_token_usage(final_response.usage_metadata)
-            return final_response.text
+            return final_response.text or ""
 
-        return response.text
+        return response.text or ""
 
     def generate_stream(
         self,
@@ -184,7 +187,7 @@ class Gemini(ModelProvider):
             if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
                 self._print_token_usage(chunk.usage_metadata)
 
-            if not chunk.candidates:
+            if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
                 continue
 
             # Check for function calls in any part of the candidate
@@ -224,5 +227,8 @@ class Gemini(ModelProvider):
                         yield final_chunk.text
                 return
 
-            if chunk.text:
-                yield chunk.text
+                return
+ 
+            text = chunk.text
+            if text:
+                yield text

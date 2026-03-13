@@ -199,7 +199,8 @@ class Agent:
                 async_mode=self.async_mode,
                 verbose=self.verbose,
                 debug=self.debug,
-                record_trace=False # Strategy internally calls agents, so we don't want deep traces
+                record_trace=False, # Strategy internally calls agents, so we don't want deep traces
+                priority=priority
             )
             # Log the intent (result) if not streaming. If streaming, the strategy handles generator.
             if not stream:

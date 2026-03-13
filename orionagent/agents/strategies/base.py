@@ -18,9 +18,9 @@ class BaseStrategy:
     """
 
     def _stream_response(
-        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True, temperature: Optional[float] = None
+        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None
     ) -> Generator[str, None, None]:
-        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace, temperature=temperature)
+        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace, priority=priority, temperature=temperature)
 
     def execute(
         self,
@@ -37,7 +37,7 @@ class BaseStrategy:
         debug: bool = False,
         record_trace: bool = True,
         hitl: Any = False,
-
+        priority: Optional[str] = None,
     ) -> Union[str, Generator[str, None, None], "AgentHandoff"]:
         """Run the strategy on *task* using the given *agents*.
 
@@ -110,14 +110,15 @@ class BaseStrategy:
         """
         words = len(task.split())
         # Increase threshold to 25 words for planning/self-learn unless specific triggers found
-        if words > 25:
+        if words > 20: # Lowered from 25
             return True
         
         # Check for sequencing or complexity indicators - refined for multi-step intent
         complex_keywords = [
             "research", "browser", "analyze", "compare", "summary", "outline",
             "first", "then", "finally", "steps", "plan",
-            "extract", "find all", "every", "multiple"
+            "extract", "find", "get", "save", "write", "scrape", "search",
+            "find all", "every", "multiple", "collect"
         ]
         task_lower = task.lower()
         if any(kw in task_lower for kw in complex_keywords):

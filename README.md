@@ -219,6 +219,8 @@ OrionAgent uses a hybrid routing engine to balance intelligence and cost. Simple
 ### 5. High-Performance Execution Engine
 OrionAgent is engineered for zero-latency. Control core performance variables directly:
 
+- **`python_sandbox` (New)**: An industrial-grade **Dynamic Reasoning Engine**. It executes complex Python logic in RAM ("Ghost Scripts") to verify math, process data, or run simulations without creating temporary files.
+
 ```python
 # 1. Enable token usage tracking and set default temperature
 llm = Gemini(model_name="gemini-2.0-flash", token_count=True, temperature=0.7)

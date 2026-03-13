@@ -27,17 +27,60 @@ class MemoryPipeline:
         session.messages.append({"role": role, "content": content})
         self.session_manager.save(session)
         
-        # Trigger summarization when we hit the chunk limit
-        if len(session.messages) >= self.config.chunk_size:
+        # Layered Summarization Logic
+        # 1. Maintain a very small Dialogue Layer (e.g. 6 messages)
+        # 2. Move excess to Recent Detailed Summary
+        if len(session.messages) > self.config.working_limit // 2:
+            self._update_recent_summary(session, llm)
+            
+        # 3. Archive Recent Summary to Chunks when Chunks of work are done (every chunk_size turns roughly)
+        # We use a simple counter or just check if recent_summary is getting complex
+        if len(session.messages) + self._estimate_tokens(session.recent_summary) // 50 > self.config.chunk_size:
             self._summarize_chunk(session, llm)
             
+    def _estimate_tokens(self, text: str) -> int:
+        """Rough estimation of tokens (4 chars per token)."""
+        if not text: return 0
+        return len(text) // 4
+
+    def _update_recent_summary(self, session: Session, llm: Any):
+        """Move older messages into a detailed 'Recent Summary' layer."""
+        if not llm or len(session.messages) < 4:
+            return
+            
+        # Take the oldest half of messages to summarize into the 'Detailed' layer
+        # This layer carries "few more details"
+        to_summarize = session.messages[:-2] # Keep at least 2 for immediate context
+        session.messages = session.messages[-2:]
+        
+        text = "\n".join([f"[{m['role']}] {m['content']}" for m in to_summarize])
+        
+        prompt = (
+            f"Update the following detailed summary with these new dialogue turns.\n"
+            f"Keep the summary DETAILED but concise (under {self.config.max_recent_summary_tokens} tokens).\n"
+            f"Focus on specific actions, decisions, and key details.\n\n"
+            f"CURRENT SUMMARY: {session.recent_summary}\n\n"
+            f"NEW TURNS:\n{text}"
+        )
+        
+        try:
+            session.recent_summary = llm.generate(prompt=prompt, system_instruction="You are a detailed but concise secretary.")
+            self.session_manager.save(session)
+        except Exception:
+            pass
+            
     def _summarize_chunk(self, session: Session, llm: Any):
-        """Compress the oldest messages into a chunk summary with structured entity extraction."""
+        """Archive the 'Recent Summary' into a concise 'Chunk Summary' and reset it."""
         if not llm:
             return
             
-        messages_to_summarize = session.messages[:self.config.chunk_size]
-        text_to_summarize = "\n".join([f"[{m['role']}] {m['content']}" for m in messages_to_summarize])
+        # Instead of just messages, we summarize the RECENT SUMMARY which already has the details
+        text_to_summarize = session.recent_summary
+        if not text_to_summarize and session.messages:
+             text_to_summarize = "\n".join([f"[{m['role']}] {m['content']}" for m in session.messages])
+             session.messages = []
+             
+        if not text_to_summarize: return
         
         # Tiered Summarization Logic
         if session.priority == "low":
@@ -81,10 +124,9 @@ class MemoryPipeline:
                 session.chunk_summaries.append(summary)
                 self._merge_entities(session, new_entities)
             else:
-                # Fallback if no JSON found
-                session.chunk_summaries.append(raw_response[:200])
+                session.chunk_summaries.append(raw_response[:self.config.max_chunk_tokens * 4])
                 
-            session.messages = session.messages[self.config.chunk_size:]
+            session.recent_summary = "" # Clear recent summary as it's now a chunk
             self.session_manager.save(session)
             
             if len(session.chunk_summaries) > 5:
@@ -130,7 +172,8 @@ class MemoryPipeline:
         
         try:
             session_summary = llm.generate(prompt=prompt, system_instruction="You are an expert conversation summarizer.")
-            session.session_summary = session_summary
+            # Ensure global summary is within limits
+            session.session_summary = session_summary[:self.config.max_global_summary_tokens * 4]
             session.chunk_summaries = [] # Clear the chunks
             self.session_manager.save(session)
         except Exception:
@@ -165,27 +208,48 @@ class MemoryPipeline:
                 val = data.get("value", "")
                 context_parts.append(f"- [{cat}] {name}: {val}")
 
-        # 3. Session Summaries (Merged)
-        if session.session_summary or session.chunk_summaries:
-            context_parts.append("\n### RECAP:")
-            if session.session_summary:
-                context_parts.append(session.session_summary)
-            for chunk in session.chunk_summaries:
-                context_parts.append(chunk)
+        # 3. Global Recap (Layer 4)
+        if session.session_summary:
+            context_parts.append("\n### GLOBAL RECAP:")
+            context_parts.append(session.session_summary[:self.config.max_global_summary_tokens * 4])
+            
+        # 4. Chunk Summaries (Layer 3)
+        if session.chunk_summaries:
+            context_parts.append("\n### ARCHIVED CHUNKS:")
+            for chunk in session.chunk_summaries[-3:]: # Only latest 3 chunks
+                context_parts.append(f"- {chunk[:self.config.max_chunk_tokens * 4]}")
                 
-        # 4. Working Memory (Recent Messages - Raw)
-        # If we have summaries, we can reduce the working memory limit to save tokens
-        limit = self.config.working_limit
-        if session.session_summary or session.chunk_summaries:
-            limit = min(limit, 6) # Keep only the absolute latest dialogue if we have a recap
-
-        recent_messages = session.messages[-limit:]
-        if recent_messages:
-            context_parts.append("\n### RECENT:")
-            for msg in recent_messages:
-                # Use single letter roles to save tokens
+        # 5. Recent Detailed Summary (Layer 2)
+        if session.recent_summary:
+            context_parts.append("\n### RECENT DETAILS:")
+            context_parts.append(session.recent_summary[:self.config.max_recent_summary_tokens * 4])
+                
+        # 6. Working Dialogue (Layer 1 - Raw)
+        if session.messages:
+            context_parts.append("\n### LATEST DIALOGUE:")
+            # Apply strict limit to raw dialogue with per-message truncation
+            remaining_budget = self.config.max_dialogue_tokens
+            
+            # We iterate in reverse to keep the LATEST messages first
+            dialogue_turns = []
+            for msg in reversed(session.messages):
+                if remaining_budget <= 0:
+                    break
+                    
                 role_char = "U" if msg["role"] == "user" else "A"
-                context_parts.append(f"{role_char}: {msg['content']}")
+                content = msg["content"]
+                content_tokens = self._estimate_tokens(content)
+                
+                if content_tokens > remaining_budget:
+                    # Truncate this specific message to fit the rest of the budget
+                    char_limit = remaining_budget * 4
+                    content = content[:char_limit] + "... [TRUNCATED]"
+                    content_tokens = remaining_budget
+                
+                dialogue_turns.insert(0, f"{role_char}: {content}")
+                remaining_budget -= content_tokens
+            
+            context_parts.extend(dialogue_turns)
                 
         return "\n".join(context_parts)
 

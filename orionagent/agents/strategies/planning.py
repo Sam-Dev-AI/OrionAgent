@@ -16,11 +16,24 @@ from orionagent.agents.strategies.base import BaseStrategy
 from orionagent.models.base_provider import ModelProvider
 
 
-_PLANNING_PROMPT = """Plan task into 1-4 steps. Agents:
+_PLANNING_PROMPT = """[INDUSTRIAL PLANNER]
+1. Decompose task into 1-4 efficient steps using available agents.
+2. NEVER refuse a task. Always find a way to use tools to get closer to the goal.
+3. If the task is broad (e.g. "leads"), first DISCOVER, then EXTRACT.
+
+Agents:
 {agents}
 
-Reply ONLY JSON: [[{{"s":"step","a":"agent"}},...],...] (Parallel groups in arrays)
-Constraints MUST be in 's'.
+[FEW-SHOT EXAMPLES]
+Task: "find hotels in NYC"
+Output: [[{{"s":"Discover hotels in NYC","a":"TheResearcher"}}], [{{"s":"Extract contacts for found hotels","a":"TheScraper"}}]]
+
+Task: "hotel leads in Mumbai without website"
+Output: [[{{"s":"Search for hotels in Mumbai likely to lack websites","a":"TheResearcher"}}], [{{"s":"Scrape contact details for the discovered list","a":"TheScraper"}}]]
+
+Output ONLY strict JSON: [[{{"s":"step_description","a":"agent_name"}},...], ...]
+(Outer array is sequence, inner array is parallel group).
+Dependent tasks MUST be in separate outer array blocks.
 
 Task: {task}"""
 
@@ -46,19 +59,15 @@ class PlanningStrategy(BaseStrategy):
         debug: bool = False,
         record_trace: bool = True,
         hitl: bool = False,
+        priority: Optional[str] = None,
 
     ) -> Union[str, Generator[str, None, None]]:
         from orionagent.tracing import tracer
-        # Fast bypass for simple conversational tasks
-        if not self.is_complex_task(task):
-            tracer.log_event("plan", "Bypassing planner", "Simple task detected", verbose=verbose, debug=debug)
-            from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl)
-
+        
         if not model:
             # No model to plan with -- fall back to single delegation
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority)
 
         from orionagent.tracing import tracer
         trace_id = tracer.start_trace("plan", "Creating task plan", task, verbose=verbose, debug=debug)
@@ -74,8 +83,8 @@ class PlanningStrategy(BaseStrategy):
 
 
         if stream:
-            return self._stream_plan(plan, agents, task, model, async_mode, temperature=temperature)
-        return self._execute_plan_full(plan, agents, task, model, async_mode, temperature=temperature)
+            return self._stream_plan(plan, agents, task, model, async_mode, priority=priority, temperature=temperature)
+        return self._execute_plan_full(plan, agents, task, model, async_mode, priority=priority, temperature=temperature)
 
     # ------------------------------------------------------------------
     # Plan creation
@@ -96,7 +105,7 @@ class PlanningStrategy(BaseStrategy):
         from orionagent.tracing import tracer
         tracer.log_event("plan", "Decomposing task into steps", task[:50], verbose=verbose, debug=debug)
         roster = "\n".join(
-            f"- {a.name}: {a.role}" for a in agents
+            f"- {a.name} ({a.role}): {a.description}. Tools: {[t.name for t in a.tools]}" for a in agents
         )
         
         prompt_task = f"{context}\n\n==== CURRENT TASK ====\n{task}" if context else task
@@ -109,17 +118,21 @@ class PlanningStrategy(BaseStrategy):
             system_instruction=si,
             temperature=temperature if temperature is not None else 0.0,
         )
-
+        
+        if debug:
+            print(f"\n[PLANNER RAW]: {raw}")
+ 
         # Parse -- strip markdown fences if the model wraps them
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1]  # drop opening fence
-            raw = raw.rsplit("```", 1)[0]  # drop closing fence
-            raw = raw.strip()
-
+        raw_clean = raw.strip()
+        if raw_clean.startswith("```"):
+            raw_clean = raw_clean.split("\n", 1)[1]  # drop opening fence
+            raw_clean = raw_clean.rsplit("```", 1)[0]  # drop closing fence
+            raw_clean = raw_clean.strip()
+ 
         try:
-            plan = json.loads(raw)
-        except json.JSONDecodeError:
+            plan = json.loads(raw_clean)
+        except json.JSONDecodeError as e:
+            print(f"[PLANNER ERROR] Failed to parse JSON: {e}")
             # If parsing fails, fall back to single-agent routing
             return [{"step": task, "agent": None}]
 
@@ -141,7 +154,7 @@ class PlanningStrategy(BaseStrategy):
         return agents[0]
 
     def _execute_plan_full(
-        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, temperature: Optional[float] = None
+        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None
     ) -> str:
         """Execute all plan steps and return ONLY the final result."""
         import concurrent.futures
@@ -157,8 +170,16 @@ class PlanningStrategy(BaseStrategy):
                 for step in group:
                     instruction = step.get("s", step.get("step", original_task))
                     agent = self._find_agent(step.get("a", step.get("agent")), agents)
-                    prompt = f"Previous result: {last_result}\n\nTask: {instruction}" if last_result else instruction
-                    last_result = agent.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature)
+                    prompt = f"### DATA CONTEXT FROM PREVIOUS STEPS ###\n{last_result}\n\n### YOUR CURRENT TASK ###\n{instruction}\n\nINSTRUCTION: Process the data context above to fulfill your task. If data is missing, use your tools to find it. DO NOT ASK QUESTIONS." if last_result else instruction
+                    last_result = agent.ask(
+                        task=prompt, 
+                        stream=False, 
+                        use_strategy=False, 
+                        record_memory=False, 
+                        record_trace=True, 
+                        priority=priority, 
+                        temperature=temperature
+                    )
             else:
                 # Parallel group
                 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -166,16 +187,25 @@ class PlanningStrategy(BaseStrategy):
                     for step in group:
                         instruction = step.get("s", step.get("step", original_task))
                         agent = self._find_agent(step.get("a", step.get("agent")), agents)
-                        prompt = f"Previous result: {last_result}\n\nTask: {instruction}" if last_result else instruction
-                        futures.append(executor.submit(agent.ask, prompt, False, False, None, False, False, None, temperature)) # task, stream, use_strategy, session_id, record_memory, record_trace, priority, temperature
+                        prompt = f"### DATA CONTEXT FROM PREVIOUS STEPS ###\n{last_result}\n\n### YOUR CURRENT TASK ###\n{instruction}\n\nINSTRUCTION: Process the data context above to fulfill your task. If data is missing, use your tools to find it. DO NOT ASK QUESTIONS." if last_result else instruction
+                        futures.append(executor.submit(
+                            agent.ask, 
+                            task=prompt, 
+                            stream=False, 
+                            use_strategy=False, 
+                            record_memory=False, 
+                            record_trace=True, 
+                            priority=priority, 
+                            temperature=temperature
+                        ))
                     
                     results = [f.result() for f in concurrent.futures.as_completed(futures)]
-                    last_result = "\n".join(results)
+                    last_result = "\n".join(str(r) for r in results if r is not None)
 
         return last_result
 
     def _stream_plan(
-        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, temperature: Optional[float] = None
+        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None
     ) -> Generator[str, None, None]:
         """Stream plan execution, yielding ONLY the final step's result."""
         import concurrent.futures
@@ -191,14 +221,30 @@ class PlanningStrategy(BaseStrategy):
                 for step_idx, step in enumerate(group):
                     instruction = step.get("s", step.get("step", original_task))
                     agent = self._find_agent(step.get("a", step.get("agent")), agents)
-                    prompt = f"Previous result: {last_result}\n\nTask: {instruction}" if last_result else instruction
+                    prompt = f"### DATA CONTEXT FROM PREVIOUS STEPS ###\n{last_result}\n\n### YOUR CURRENT TASK ###\n{instruction}\n\nINSTRUCTION: Process the data context above to fulfill your task. If data is missing, use your tools to find it. DO NOT ASK QUESTIONS." if last_result else instruction
                     
                     is_final_step = is_final_group and (step_idx == len(group) - 1)
                     
                     if is_final_step:
-                        yield from agent.ask(prompt, stream=True, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature)
+                        yield from agent.ask(
+                            task=prompt, 
+                            stream=True, 
+                            use_strategy=False, 
+                            record_memory=False, 
+                            record_trace=True, 
+                            priority=priority, 
+                            temperature=temperature
+                        )
                     else:
-                        last_result = agent.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=False, temperature=temperature)
+                        last_result = agent.ask(
+                            task=prompt, 
+                            stream=False, 
+                            use_strategy=False, 
+                            record_memory=False, 
+                            record_trace=True, 
+                            priority=priority, 
+                            temperature=temperature
+                        )
             else:
                 # Parallel group execution
                 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -207,7 +253,16 @@ class PlanningStrategy(BaseStrategy):
                         instruction = step.get("s", step.get("step", original_task))
                         agent = self._find_agent(step.get("a", step.get("agent")), agents)
                         prompt = f"Previous result: {last_result}\n\nTask: {instruction}" if last_result else instruction
-                        futures.append(executor.submit(agent.ask, prompt, False, False, None, False, False, None, temperature))
+                        futures.append(executor.submit(
+                            agent.ask, 
+                            task=prompt, 
+                            stream=False, 
+                            use_strategy=False, 
+                            record_memory=False, 
+                            record_trace=True, 
+                            priority=priority, 
+                            temperature=temperature
+                        ))
                     
                     results = [f.result() for f in concurrent.futures.as_completed(futures)]
                     last_result = "\n".join(results)

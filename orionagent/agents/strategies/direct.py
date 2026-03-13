@@ -30,6 +30,7 @@ class DirectStrategy(BaseStrategy):
         debug: bool = False,
         record_trace: bool = True,
         hitl: bool = False,
+        priority: Optional[str] = None,
     ) -> Union[str, Generator[str, None, None], Any]:
 
         prompt = f"{context}\n\n==== CURRENT TASK ====\n{task}" if context else task
@@ -67,9 +68,17 @@ class DirectStrategy(BaseStrategy):
                 raise InterruptedError("Delegation rejected by user via HITL.")
 
         if stream:
-            return self._stream_response(selected, prompt, model, record_trace=record_trace, temperature=temperature)
+            return self._stream_response(selected, prompt, model, record_trace=record_trace, priority=priority, temperature=temperature)
         
-        result = selected.ask(prompt, stream=False, use_strategy=False, record_memory=False, record_trace=record_trace, temperature=temperature)
+        result = selected.ask(
+            task=prompt, 
+            stream=False, 
+            use_strategy=False, 
+            record_memory=False, 
+            record_trace=record_trace, 
+            priority=priority, 
+            temperature=temperature
+        )
         return result
 
     def _approve_direct(self, task: str, agent_name: str, h_cfg: "HitlConfig") -> bool:
@@ -114,6 +123,14 @@ class DirectStrategy(BaseStrategy):
         )
 
     def _stream_response(
-        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True, temperature: float = None
+        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True, priority: Optional[str] = None, temperature: float = None
     ) -> Generator[str, None, None]:
-        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace, temperature=temperature)
+        yield from agent.ask(
+            task=task, 
+            stream=True, 
+            use_strategy=False, 
+            record_memory=False, 
+            record_trace=record_trace, 
+            priority=priority, 
+            temperature=temperature
+        )

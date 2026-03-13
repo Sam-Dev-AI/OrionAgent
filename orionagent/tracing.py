@@ -44,6 +44,16 @@ class TraceManager:
             cls._instance.debug = False # Global debug flag
         return cls._instance
 
+    @property
+    def history(self) -> List[Dict[str, Any]]:
+        """Return the event history as a list of dictionaries."""
+        hist = []
+        for e in self.events:
+            d = asdict(e)
+            d["event"] = d["event_type"] # Compatibility/Alias
+            hist.append(d)
+        return hist
+
     def log_event(self, event_type: str, name: str, input_data: Any, 
                   output_data: Any = None, duration: float = 0.0, 
                   metadata: Dict[str, Any] = None, verbose: bool = False,

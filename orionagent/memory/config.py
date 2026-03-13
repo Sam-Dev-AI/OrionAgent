@@ -22,7 +22,14 @@ class MemoryConfig:
     mode: str = "session" # none, session, persistent, long_term, chroma
     working_limit: int = 12
     chunk_size: int = 20
-    summary_tokens: int = 120
+    summary_tokens: int = 500 # chunk summary limit
+    
+    # Layered Limits (New)
+    max_dialogue_tokens: int = 500
+    max_recent_summary_tokens: int = 300
+    max_chunk_tokens: int = 500
+    max_global_summary_tokens: int = 1000
+    
     importance_threshold: int = 7
     vector_top_k: int = 5
     storage_path: str = "memory"

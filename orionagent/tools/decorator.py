@@ -214,6 +214,11 @@ class FunctionTool(Tool):
             return f"Error executing tool '{self.name}': {e}"
 
 
+    def __call__(self, *args, **kwargs):
+        """Allow calling the tool directly as a function."""
+        return self._func(*args, **kwargs)
+
+
 # ------------------------------------------------------------------
 # Public decorator
 # ------------------------------------------------------------------

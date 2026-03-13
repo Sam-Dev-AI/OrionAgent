@@ -34,7 +34,7 @@ from orionagent.models.base_provider import ModelProvider
 from orionagent.models.model import Model
 from orionagent.models.provider_registry import get_provider, register_provider, list_providers
 from orionagent.tools import (
-    Tool, ToolExecutor, tool, file_manager, web_browser, system_tools, execute_python, execute_command, default_tools
+    Tool, ToolExecutor, tool, file_manager, web_browser, system_tools, python_sandbox, execute_command, default_tools
 )
 from orionagent.memory import Session, MemoryConfig, JSONStorage, InMemoryStorage, SQLiteStorage
 from orionagent import memory
@@ -61,7 +61,7 @@ __all__ = [
     "file_manager",
     "web_browser",
     "system_tools",
-    "execute_python",
+    "python_sandbox",
     "execute_command",
     "Session",
     "MemoryConfig",

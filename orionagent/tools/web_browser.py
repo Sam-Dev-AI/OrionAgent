@@ -11,11 +11,17 @@ class WebAction(Enum):
 
 @tool
 def web_browser(action: WebAction, query_or_url: str) -> str:
-    """A browser simulator to search the public web or fetch raw page contents.
+    """A high-performance browser simulator for web discovery and data extraction.
+    Use this to bridge the gap between your training data and the real-time world.
+
+    When to use:
+    - Searching for recent news, business listings, or technical documentation.
+    - Fetching the raw text content of a specific URL for deep analysis.
+    - Verifying if a business has a website or checking its contact page.
 
     Args:
-        action (WebAction): The action to perform (search or fetch).
-        query_or_url (str): The search query (if searching) or the full URL (if fetching).
+        action: The execution mode. 'search' for DuckDuckGo discovery, 'fetch' for direct URL reading.
+        query_or_url: The search string (e.g., 'Latest Nvidia GPUs') or absolute URL (e.g., 'https://openai.com').
     """
     if isinstance(action, str):
         try:

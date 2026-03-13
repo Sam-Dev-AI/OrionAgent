@@ -14,6 +14,7 @@ class Session:
         self.session_id = session_id or str(uuid.uuid4())
         self.messages: List[Dict[str, str]] = []
         self.chunk_summaries: List[str] = []
+        self.recent_summary: str = "" # Layer for "few more details" but short
         self.session_summary: str = ""
         self.entities: Dict[str, Dict[str, Any]] = {} # name -> {value, category, importance}
         self.priority: str = "normal"
@@ -27,6 +28,7 @@ class Session:
             "agent_id": self.agent_id,
             "messages": self.messages,
             "chunk_summaries": self.chunk_summaries,
+            "recent_summary": self.recent_summary,
             "session_summary": self.session_summary,
             "entities": self.entities,
             "priority": self.priority,
@@ -43,6 +45,7 @@ class Session:
         )
         session.messages = data.get("messages", [])
         session.chunk_summaries = data.get("chunk_summaries", [])
+        session.recent_summary = data.get("recent_summary", "")
         session.session_summary = data.get("session_summary", "")
         session.entities = data.get("entities", {})
         session.priority = data.get("priority", "normal")

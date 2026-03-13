@@ -12,13 +12,17 @@ class FileAction(Enum):
     CREATE_DIR = "create_dir"
 
 @tool
-def file_manager(action: FileAction, filepath: str, content: Optional[str] = None) -> str:
-    """A comprehensive OS file manager for listing, reading, and modifying files/directories.
+def file_manager(action: FileAction, filepath: str, content: str) -> str:
+    """An industrial-grade OS file manager for system-level file operations.
+    You have full read/write access to the local filesystem.
     
+    CRITICAL: Always use absolute paths when possible. If you create a file, ensure
+    the parent directories exist (the tool will attempt to create them automatically).
+
     Args:
-        action (FileAction): The exact action to perform (read, write, append, list, delete, create_dir).
-        filepath (str): The absolute or relative path to the file or directory.
-        content (str): The text content to write or append (required for write/append actions).
+        action: The operation (read, write, append, list, delete, create_dir).
+        filepath: The path to the target file or directory.
+        content: The data payload for write/append operations. Leave empty for others.
     """
     if isinstance(action, str):
         try:
@@ -32,7 +36,8 @@ def file_manager(action: FileAction, filepath: str, content: Optional[str] = Non
                 return f.read()
                 
         elif action == FileAction.WRITE:
-            if content is None: return "Error: content is required for write action."
+            print(f"DEBUG: File Manager WRITE called for {filepath}")
+            if content is None: content = "" # Handle null from LLMs
             os.makedirs(os.path.dirname(os.path.abspath(filepath)) or ".", exist_ok=True)
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(content)
