@@ -494,12 +494,28 @@ While OrionAgent provides powerful default tools, high-precision industrial agen
 In AI-driven development (Vibe Coding), you aren't just writing code; you are building a **Swarm Ecosystem**. The Manager's planner chooses agents based on the **clarity of their metadata**.
 
 ### A. High-Granularity Metadata (Selection Accuracy)
-The `description` is the ONLY thing the Manager sees during the planning phase. Use the **Capability-Tool-Output (CTO)** pattern:
-- **Pattern**: `Extracts [Data] from [Source] using [Tool]. Returns [Format].`
-- **Example**: `description="Extracts lead metadata from URLs using web_browser. Returns a structured JSON string of contact info."`
+The `description` is the primary metadata used by the Manager's `PlanningStrategy`. If the description is vague, the Manager will fail to select the right agent during complex task decomposition.
 
-### B. Industrial System Instructions (The "Moat" Pattern)
-To keep the context window clean while maintaining 100% reliability, follow the **Moat-Link-Action** logic:
+**Selection Comparison:**
+| Level | `description` Pattern | Result |
+| :--- | :--- | :--- |
+| **Generic** | `"Scrapes websites."` | **Failure.** Manager might skip this agent for "Lead Generation" tasks. |
+| **Industrial** | `"Extracts specific emails and contact info from URLs using web_browser. Returns structured contact data."` | **Success.** Planner maps "find leads" directly to this capability. |
+
+### B. Industrial System Instructions (The Orchestration Guarantee)
+A "Hard-Level" agent doesn't just know what it is; it knows **how** it must interact with the swarm.
+
+#### 1. Agent-Level Instructions (The Moat)
+Enforce tool-primacy to prevent the LLM from trying to "hallucinate" a summary without actually executing the work.
+- **Vibe**: `"You are a Researcher. You MUST call 'web_browser' for every discovery task. Do not summarize until tool output is received."`
+
+#### 2. Manager-Level Instructions (The Architect)
+The Manager needs to know its role as a coordinator, not just a chatbot.
+- **Pattern**: Define the "Industrial Path" and specify which agents handle which parts of the moat.
+- **Vibe**: `"You are the SalesDirector. Coordinate 'LeadFinder' for URLs and 'DataWriter' for file saving. Ensure the loop is: Find -> Scrape -> Save."`
+
+### C. The "Moat-Link-Action" Pattern
+To keep the context window clean while maintaining 100% reliability:
 1. **The Moat**: Define the scope. `"You are a [Specialist]. You only do [X]."`
 2. **The Link**: Link tools to identities. `"You MUST use 'python_sandbox' for all logic verification."`
 3. **The Action**: Enforce the outcome. `"Save every result via 'file_manager'. Do not ask for confirmation."`
