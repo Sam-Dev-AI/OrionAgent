@@ -153,6 +153,10 @@ cython_debug/
 # Project specific
 mgr_vault/
 memory/
+orion_data/
+.agent/skills/testing_skill
+tests/hard_tests/
+test/
 *.db
 *.json
 pyproject.toml
