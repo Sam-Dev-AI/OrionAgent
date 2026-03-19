@@ -25,7 +25,7 @@ _STRATEGY_MAP = {
 
 
 def get_strategy(
-    strategy: Union[str, List[str], None] = None,
+    strategy: Union[str, List[str], None] = "planning",
     **kwargs,
 ) -> BaseStrategy:
     """Create a strategy instance from a keyword or list of keywords.
@@ -45,7 +45,7 @@ def get_strategy(
         ValueError: If an unknown strategy name is given.
     """
     if strategy is None:
-        return DirectStrategy()
+        return PlanningStrategy()
 
     # Normalise to a list
     if isinstance(strategy, str):

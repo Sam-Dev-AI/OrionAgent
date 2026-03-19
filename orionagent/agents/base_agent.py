@@ -53,7 +53,6 @@ class Agent:
         user_id: str = "default_user",
         strategy: Optional[Union[str, List[str]]] = None,
         max_refinements: int = 2,
-        guards: Optional[List[Union[str, Callable]]] = None,
         verbose: bool = False,
         async_mode: bool = True,
         debug: bool = False,
@@ -126,10 +125,6 @@ class Agent:
         from orionagent.agents.strategies import get_strategy
         self._strategy = get_strategy(strategy, max_refinements=max_refinements)
 
-        # --- Logic Guards (Simple DX) ---
-        if guards:
-            from orionagent.agents.guards import apply_guards
-            self.ask = apply_guards(self.ask, guards)
 
         # --- Memory tools (auto-injected) ---
         if self.memory_config.mode in ["persistent", "chroma"]:

@@ -5,7 +5,7 @@ Simple, Persistent & Industrially Robust.
 This script demonstrates a high-performance single agent utilizing:
 - Native Model Integration (Gemini 2.0 Flash)
 - Hierarchical Memory (Persistent SQLite Storage)
-- Logic Guards (Tone, emoji-free, and brevity control)
+- Hierarchical Memory (Persistent SQLite Storage)
 - Multi-Tooling (Custom AI tools with verdict evaluation)
 """
 
@@ -51,15 +51,14 @@ def main():
         memory="long_term",        # Seamlessly saves conversation to memory/orionagent.db
         use_default_tools=True,    # Injects Web Search, Terminal, Python, and Files tools
         tools=[analyze_sentiment, get_crypto_price, calculate_roi],
-        guards=["straight", "short"], # Logic Guards: No emojis, Max 3 sentences
         verbose=True,              # Post-session summary
-        debug=True,                # Real-time 'Industrial' logs: [PLAN], [TOOL], [GUARD], [MEMORY]
+        debug=True,                # Real-time 'Industrial' logs: [PLAN], [TOOL], [MEMORY]
     )
 
     print("\n" + "="*50)
     print("ORIONAGENT: THE SOVEREIGN AGENT FRAMEWORK")
     print("="*52)
-    print("FEATURES: Persistence + Logic Guards + Multi-Tooling")
+    print("FEATURES: Persistence + Multi-Tooling")
     print("STRATEGY: Single Agent Power-Loop")
     print("COMMANDS: Type 'exit' to quit.\n")
 

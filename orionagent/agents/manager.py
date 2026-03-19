@@ -30,7 +30,7 @@ Usage:
         print(chunk, end="", flush=True)
 """
 
-from typing import Generator, List, Optional, Union, Any, Dict
+from typing import Generator, List, Optional, Union, Any, Dict, Callable
 from orionagent.agents.base_agent import Agent
 from orionagent.models.base_provider import ModelProvider
 from orionagent.agents.strategies import get_strategy
@@ -63,7 +63,7 @@ class Manager:
         self,
         name: str = "Manager",
         model: Optional[ModelProvider] = None,
-        strategy: Optional[Union[str, List[str]]] = None,
+        strategy: Optional[Union[str, List[str]]] = "planning",
         system_instruction: Optional[str] = None,
         memory: Union[str, Dict[str, Any], "MemoryConfig"] = "session",
         agents: Optional[List[Agent]] = None,
@@ -148,6 +148,7 @@ class Manager:
         if agents:
             for agent in agents:
                 self.add(agent)
+
 
     @property
     def agents(self) -> List[Agent]:

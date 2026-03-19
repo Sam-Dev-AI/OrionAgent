@@ -100,6 +100,7 @@ class Gemini(ModelProvider):
         tools: Optional[List[Tool]] = None,
     ) -> str:
         """Send *prompt* to Gemini. Intercepts and executes tools automatically."""
+        from google.genai import types
         config = self._build_config(
             system_instruction, 
             temperature if temperature is not None else self.temperature, 
@@ -107,57 +108,49 @@ class Gemini(ModelProvider):
             tools
         )
 
-        response = self._client.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            config=config,
-        )
+        history = [types.Content(role="user", parts=[types.Part(text=prompt)])]
+        
+        def get_text(content):
+            if not content or not content.parts:
+                return ""
+            return "".join(p.text for p in content.parts if p.text)
 
-        # Accumulate tokens
-        self._print_token_usage(response.usage_metadata)
-
-        # Handle tool calls
-        if not response.candidates or not response.candidates[0].content or not response.candidates[0].content.parts:
-            return response.text or ""
-
-        has_function_call = any(part.function_call for part in response.candidates[0].content.parts)
-        if has_function_call:
-            from orionagent.tools.tool_executor import ToolExecutor
-            executor = ToolExecutor()
-            
-            tool_outputs = []
-            for part in response.candidates[0].content.parts:
-                if part.function_call:
-                    name = part.function_call.name
-                    args = part.function_call.args
-                    res = executor.execute(name, args, tools)
-                    tool_outputs.append({
-                        "call_id": None, # Gemini 0.1 doesn't use call_id in simple mode
-                        "name": name,
-                        "output": res
-                    })
-
-            # Send back to model
-            from google.genai import types
-            
-            # Gemini expects the full history for tool results
-            history = [
-                types.Content(role="user", parts=[types.Part(text=prompt)]),
-                response.candidates[0].content,
-                types.Content(role="user", parts=[
-                    types.Part(function_response=types.FunctionResponse(name=o["name"], response={"result": o["output"]})) for o in tool_outputs
-                ])
-            ]
-
-            final_response = self._client.models.generate_content(
+        while True:
+            response = self._client.models.generate_content(
                 model=self.model_name,
                 contents=history,
                 config=config,
             )
-            self._print_token_usage(final_response.usage_metadata)
-            return final_response.text or ""
+            self._print_token_usage(response.usage_metadata)
 
-        return response.text or ""
+            if not response.candidates or not response.candidates[0].content:
+                return ""
+
+            content = response.candidates[0].content
+            history.append(content)
+
+            has_function_call = any(part.function_call for part in content.parts)
+            if not has_function_call:
+                return get_text(content)
+
+            # Process Tool Calls
+            from orionagent.tools.tool_executor import ToolExecutor
+            executor = ToolExecutor()
+            
+            tool_parts = []
+            for part in content.parts:
+                if part.function_call:
+                    name = part.function_call.name
+                    args = part.function_call.args
+                    if self.verbose:
+                        print(f"\033[94m[TOOL CALL: {name}({args})]\033[0m")
+                    res = executor.execute(name, args, tools)
+                    tool_parts.append(
+                        types.Part(function_response=types.FunctionResponse(name=name, response={"result": res}))
+                    )
+            
+            history.append(types.Content(role="user", parts=tool_parts))
+            # Loop continues to get the next model response based on tool output
 
     def generate_stream(
         self,
@@ -168,6 +161,7 @@ class Gemini(ModelProvider):
         tools: Optional[List[Tool]] = None,
     ) -> Generator[str, None, None]:
         """Yield chunks from Gemini. Intercepts and executes tools automatically."""
+        from google.genai import types
         config = self._build_config(
             system_instruction, 
             temperature if temperature is not None else self.temperature, 
@@ -175,60 +169,62 @@ class Gemini(ModelProvider):
             tools
         )
 
-        stream = self._client.models.generate_content_stream(
-            model=self.model_name,
-            contents=prompt,
-            config=config,
-        )
+        history = [types.Content(role="user", parts=[types.Part(text=prompt)])]
 
-        full_content = []
-        for chunk in stream:
-            # Capture usage metadata
-            if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
-                self._print_token_usage(chunk.usage_metadata)
+        while True:
+            stream = self._client.models.generate_content_stream(
+                model=self.model_name,
+                contents=history,
+                config=config,
+            )
 
-            if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
-                continue
+            current_content_parts = []
+            has_tool_call = False
+            
+            last_usage = None
+            for chunk in stream:
+                if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                    last_usage = chunk.usage_metadata
 
-            # Check for function calls in any part of the candidate
-            has_function_call = any(part.function_call for part in chunk.candidates[0].content.parts)
-            if has_function_call:
-                # Tool call detected in stream.
-                # Logic: collect all chunks, execute, then re-call generate
-                # But typically Gemini tool calls are non-streaming in the functional part.
-                # For simplicity, if we detect a tool call, we stop streaming and handle as full.
-                # Gemini tool calls in stream usually contain the whole call in one candidate.
-                
-                from orionagent.tools.tool_executor import ToolExecutor
-                executor = ToolExecutor()
-                
-                tool_outputs = []
-                for part in chunk.candidates[0].content.parts:
-                    if part.function_call:
-                        res = executor.execute(part.function_call.name, part.function_call.args, tools)
-                        tool_outputs.append({"name": part.function_call.name, "output": res})
+                if not chunk.candidates or not chunk.candidates[0].content:
+                    continue
 
-                from google.genai import types
-                history = [
-                    types.Content(role="user", parts=[types.Part(text=prompt)]),
-                    chunk.candidates[0].content,
-                    types.Content(role="user", parts=[
-                        types.Part(function_response=types.FunctionResponse(name=o["name"], response={"result": o["output"]})) for o in tool_outputs
-                    ])
-                ]
+                content = chunk.candidates[0].content
+                for part in content.parts:
+                    if part.text:
+                        current_content_parts.append(part)
+                        yield part.text
+                    elif part.function_call:
+                        has_tool_call = True
+                        current_content_parts.append(part)
+                        # Print to logs only if verbose
+                        if self.verbose:
+                            print(f"\n\033[94m[TOOL CALL: {part.function_call.name}]\033[0m")
+            
+            # Apply usage only once per stream turn
+            if last_usage:
+                self._print_token_usage(last_usage)
 
-                final_stream = self._client.models.generate_content_stream(
-                    model=self.model_name,
-                    contents=history,
-                    config=config,
-                )
-                for final_chunk in final_stream:
-                    if final_chunk.text:
-                        yield final_chunk.text
-                return
+            # After stream finishes, check if we need to call tools
+            full_content = types.Content(role="model", parts=current_content_parts)
+            history.append(full_content)
 
-                return
- 
-            text = chunk.text
-            if text:
-                yield text
+            if not has_tool_call:
+                break
+
+            # Execute tools and add results to history
+            from orionagent.tools.tool_executor import ToolExecutor
+            executor = ToolExecutor()
+            
+            tool_parts = []
+            for part in current_content_parts:
+                if part.function_call:
+                    name = part.function_call.name
+                    args = part.function_call.args
+                    res = executor.execute(name, args, tools)
+                    tool_parts.append(
+                        types.Part(function_response=types.FunctionResponse(name=name, response={"result": res}))
+                    )
+            
+            history.append(types.Content(role="user", parts=tool_parts))
+            # Loop restarts with history containing tool responses

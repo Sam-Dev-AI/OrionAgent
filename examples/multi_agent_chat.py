@@ -7,7 +7,7 @@ specialized agents using the combined 'planning' and 'self_learn' strategy.
 
 Key Advantages vs LangChain/AutoGen:
 1. Zero-Magic Orchestration: You control the exact strategy (Planning + Self-Learn).
-2. Logic Guards: Every agent output is evaluated for quality before moving to the next step.
+2. Shared Intelligence: Shared memory and knowledge via persistent SQLite storage.
 3. Token Optimization: Shared system instructions and context.
 4. Long-Term Memory: Shared knowledge via persistent SQLite storage.
 """
@@ -30,7 +30,6 @@ def main():
         description="Expert at deep-web technical research and data extraction.",
         memory="session",
         use_default_tools=True,    # Auto-loads Web, Terminal, Python tools
-        guards=["straight"],        # Enforcement: No emojis/fluff in data
         verbose=True
     )
 
@@ -39,7 +38,6 @@ def main():
         role="Business Strategy Consultant",
         description="Analyzes raw data to extract ROI, risks, and strategic trends.",
         memory="long_term",        # Retains business logic context across runs
-        guards=["short", "straight"], # Enforcement: Brief, no emoji, professional tone
         verbose=True
     )
 

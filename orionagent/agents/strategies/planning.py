@@ -162,6 +162,10 @@ class PlanningStrategy(BaseStrategy):
 
         # plan is now List[List[Dict]] (groups of parallel steps)
         for group in plan:
+            # Safeguard: Trim context if it gets too large to save tokens
+            if len(last_result) > 10000:
+                last_result = last_result[:5000] + "\n... [context truncated to save tokens] ...\n" + last_result[-5000:]
+            
             if not isinstance(group, list):
                 group = [group] # robustness for single-step legacy or malformed plans
                 
@@ -212,6 +216,10 @@ class PlanningStrategy(BaseStrategy):
         last_result = ""
         
         for i, group in enumerate(plan, 1):
+            # Safeguard: Trim context if it gets too large to save tokens
+            if len(last_result) > 10000:
+                last_result = last_result[:5000] + "\n... [context truncated to save tokens] ...\n" + last_result[-5000:]
+                
             if not isinstance(group, list):
                 group = [group]
                 
@@ -220,38 +228,37 @@ class PlanningStrategy(BaseStrategy):
             if len(group) == 1 or not async_mode:
                 for step_idx, step in enumerate(group):
                     instruction = step.get("s", step.get("step", original_task))
-                    agent = self._find_agent(step.get("a", step.get("agent")), agents)
+                    agent_name = step.get("a", step.get("agent", "Unknown"))
+                    agent = self._find_agent(agent_name, agents)
+                    
+                    yield f"\n\033[1m[STEP {i}] {agent_name}: {instruction}\033[0m\n"
+                    
                     prompt = f"### DATA CONTEXT FROM PREVIOUS STEPS ###\n{last_result}\n\n### YOUR CURRENT TASK ###\n{instruction}\n\nINSTRUCTION: Process the data context above to fulfill your task. If data is missing, use your tools to find it. DO NOT ASK QUESTIONS." if last_result else instruction
                     
-                    is_final_step = is_final_group and (step_idx == len(group) - 1)
+                    step_res = ""
+                    for chunk in agent.ask(
+                        task=prompt, 
+                        stream=True, 
+                        use_strategy=False, 
+                        record_memory=False, 
+                        record_trace=True, 
+                        priority=priority, 
+                        temperature=temperature
+                    ):
+                        step_res += chunk
+                        yield chunk
                     
-                    if is_final_step:
-                        yield from agent.ask(
-                            task=prompt, 
-                            stream=True, 
-                            use_strategy=False, 
-                            record_memory=False, 
-                            record_trace=True, 
-                            priority=priority, 
-                            temperature=temperature
-                        )
-                    else:
-                        last_result = agent.ask(
-                            task=prompt, 
-                            stream=False, 
-                            use_strategy=False, 
-                            record_memory=False, 
-                            record_trace=True, 
-                            priority=priority, 
-                            temperature=temperature
-                        )
+                    last_result = step_res
+                    yield "\n"
             else:
                 # Parallel group execution
+                yield f"\n\033[1m[STEP {i}] Parallel Execution Group\033[0m\n"
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     futures = []
                     for step in group:
                         instruction = step.get("s", step.get("step", original_task))
-                        agent = self._find_agent(step.get("a", step.get("agent")), agents)
+                        agent_name = step.get("a", step.get("agent", "Unknown"))
+                        agent = self._find_agent(agent_name, agents)
                         prompt = f"Previous result: {last_result}\n\nTask: {instruction}" if last_result else instruction
                         futures.append(executor.submit(
                             agent.ask, 
@@ -264,11 +271,13 @@ class PlanningStrategy(BaseStrategy):
                             temperature=temperature
                         ))
                     
-                    results = [f.result() for f in concurrent.futures.as_completed(futures)]
-                    last_result = "\n".join(results)
+                    results = []
+                    for future in concurrent.futures.as_completed(futures):
+                        res = future.result()
+                        results.append(res)
+                        yield f"- {res}\n"
                     
-                    if is_final_group:
-                        yield last_result
+                    last_result = "\n".join(results)
                         
     def _approve_plan(self, plan: list, original_task: str, h_cfg: "HitlConfig") -> bool:
         """Interactive terminal approval for the generated plan."""

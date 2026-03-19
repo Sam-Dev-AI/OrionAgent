@@ -3,7 +3,7 @@
 
 <div align="center">
 
-*An Industrially Robust, Minimalistic Multi-Agent System featuring Deterministic Persistence and Logic Validation*
+*An Industrially Robust, Minimalistic Multi-Agent System featuring Deterministic Persistence*
 
 <br />
 
@@ -27,15 +27,15 @@
 
 ## Overview
 
-**OrionAgent** is a cutting-edge multi-agent orchestration framework designed to democratize professional-grade agentic workflows. Powered by the **Orion Engine**—a smart conversational core featuring **Multi-Provider LLM Support** (OpenAI, Gemini, Anthropic, Ollama) with **Deterministic Logic Guards**—OrionAgent offers real-time, actionable task execution for industrial-scale projects.
+**OrionAgent** is a cutting-edge multi-agent orchestration framework designed to democratize professional-grade agentic workflows. Powered by the **Orion Engine**—a smart conversational core featuring **Multi-Provider LLM Support** (OpenAI, Gemini, Anthropic, Ollama)—OrionAgent offers real-time, actionable task execution for industrial-scale projects.
 
-Whether you are building complex research swarms or precision-driven automation pipelines, the **Orion Agent** acts as your 24/7 technical companion, ensuring every output is validated, persistent, and token-efficient.
+Whether you are building complex research swarms or precision-driven automation pipelines, the **Orion Agent** acts as your 24/7 technical companion, ensuring every output is persistent and token-efficient.
 
 ---
 
 ## Philosophy
 
-OrionAgent is designed to eliminate the **black box** complexity of modern agent frameworks. It provides a low-abstraction, high-control environment for building agents that are **token-efficient** (via Clean Brain context pruning), **persistent by default**, and **deterministic** via logic guards.
+OrionAgent is designed to eliminate the **black box** complexity of modern agent frameworks. It provides a low-abstraction, high-control environment for building agents that are **token-efficient** (via Clean Brain context pruning) and **persistent by default**.
 
 ---
 
@@ -79,7 +79,6 @@ agent = Agent(
     memory="long_term",          # Automatic SQLite Knowledge Storage
     use_default_tools=True,      # Integrated Web, File, and OS tools
     tools=[crypto_ticker],
-    guards=["straight", "short"], # Deterministic Output Validation
     temperature=0.7,             # Model Creativity Control
     verbose=True                 # Premium Dimmed Trace Logs
 )
@@ -107,8 +106,7 @@ researcher = Agent(
 writer = Agent(
     name="Writer",
     role="Content Strategist",
-    system_instruction="Synthesize complex data into premium reports.",
-    guards=["straight", "long"]
+    system_instruction="Synthesize complex data into premium reports."
 )
 
 # 3. Link via Manager
@@ -129,20 +127,8 @@ manager.chat("Draft a technical report on 2024 industrial AI trends.")
 
 OrionAgent utilizes a granular, declarative configuration system built for industrial-scale reliability. Below is a deep dive into the core execution variables that power the framework.
 
-### 1. Deterministic Logic Guardrails
-Guardrails act as a real-time auditor for agent outputs. They are applied as a declarative list of strings or custom functions.
 
-```python
-agent = Agent(
-    guards=["straight", "short", "json"], # Apply specific validators
-    max_refinements=3                     # Max attempts for self-correction
-)
-```
-- **`json`**: Forces output into a valid JSON schema.
-- **`straight`**: Removes "fluff" (e.g. "I hope this helps") and emojis.
-- **`short` / `long`**: Strictly controls the sentence count/density.
-
-### 2. Memory Levels (`memory`)
+### 1. Memory Levels (`memory`)
 OrionAgent uses a **Tiered Logic Engine** to scale context. Select your ecosystem power level:
 
 | Level | Mode | Behavior | Power |
@@ -174,7 +160,7 @@ agent = Agent(
 - **Priority Tiers**: Control how deep the extraction goes with `low` (token-saving), `medium` (balanced), and `high` (exhaustive) tiers.
 
 
-### 3. Strategic Orchestration (`strategy`)
+### 2. Strategic Orchestration (`strategy`)
 The `Manager` employs recursive strategy loops to decompose and execute complex goals.
 
 ```python
@@ -207,7 +193,7 @@ manager = Manager(
 | `medium` | Asks only for high-impact actions (Risk-based). |
 | `high` | Complete autonomy (Default if hitl=False). |
 
-### 4. Smart Strategy Radar (Planning Threshold)
+### 3. Smart Strategy Radar (Planning Threshold)
 OrionAgent uses a hybrid routing engine to balance intelligence and cost. Simple conversational tasks automatically bypass expensive orchestration.
 
 **Threshold Logic:**
@@ -216,7 +202,7 @@ OrionAgent uses a hybrid routing engine to balance intelligence and cost. Simple
 
 **Complexity Keywords**: `research`, `browser`, `analyze`, `compare`, `summary`, `outline`, `first`, `then`, `finally`, `steps`, `plan`, `extract`, `find all`.
 
-### 5. High-Performance Execution Engine
+### 4. High-Performance Execution Engine
 OrionAgent is engineered for zero-latency. Control core performance variables directly:
 
 - **`python_sandbox` (New)**: An industrial-grade **Dynamic Reasoning Engine**. It executes complex Python logic in RAM ("Ghost Scripts") to verify math, process data, or run simulations without creating temporary files.
@@ -239,7 +225,7 @@ agent.ask("What is the speed of light?", temperature=0.0)
 
 - **`token_count=True`**: Tracks input/output tokens for precise cost monitoring.
 - **`async_mode=True`**: Executes independent tasks in parallel (up to 60% faster).
-- **`debug=True`**: Enables live `[PLAN]`, `[TOOL]`, `[GUARD]` tags in terminal.
+- **`debug=True`**: Enables live `[PLAN]`, `[TOOL]` tags in terminal.
 
 ---
 
@@ -325,13 +311,8 @@ Decoupled execution architecture for zero-latency orchestration.
               └───────┬───────┘        └──────────────────────────┘
                       │
               ┌───────▼───────┐        ┌──────────────────────────┐
-              │    AGENT      │◄──────▶│    TOOL REGISTRY         │
-              │ (Worker)      │        │ (AI-Authenticated Tools) │
-              └───────┬───────┘        └──────────────────────────┘
-                      │
-              ┌───────▼───────┐        ┌──────────────────────────┐
-              │ LOGIC GUARDS  │───────▶│    MEMORY CORE           │
-              │ (Auditor)     │        │ (Hierarchical SQLite)    │
+              │    AGENT      │───────▶│    MEMORY CORE           │
+              │ (Worker)      │        │ (Hierarchical SQLite)    │
               └───────────────┘        └──────────────────────────┘
 ```
 
@@ -382,7 +363,7 @@ graph TD
 | Metric | OrionAgent | LangChain | AutoGen |
 | :--- | :--- | :--- | :--- |
 | **Abstraction** | **Minimalist** | Heavy | Moderate |
-| **Logic Control** | **Deterministic Guards** | Custom Parsers | Limited |
+| **Logic Control** | **Internal Safeguards** | Custom Parsers | Limited |
 | **Memory** | **Native SQLite Briefing** | Manual Pipeline | Basic Session |
 | **Setup Cost** | **Zero-Config** | High Integration | Moderate |
 

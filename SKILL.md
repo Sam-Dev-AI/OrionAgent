@@ -10,7 +10,7 @@ This guide contains industrial patterns that enable **AI-to-AI Orchestration**. 
 OrionAgent follows a hierarchical execution model:
 
 -   **Model Layer**: Low-level provider drivers (Gemini, OpenAI, Ollama). Handles system-native caching and token counting.
--   **Agent Layer**: The "Sovereign Worker". Encapsulates its own instructions, tools, logic guards, and memory state.
+-   **Agent Layer**: The "Sovereign Worker". Encapsulates its own instructions, tools, and memory state.
 -   **Manager Layer**: The "Architect". Orchestrates multiple agents using recursive planning and evaluation strategies.
 -   **Memory Layer**: Hierarchical storage ranging from fast session buffers to persistent SQLite knowledge vaults.
 
@@ -27,11 +27,10 @@ When defining an `Agent`, every parameter is tunable for specific engineering ne
 | `description` | `str` | **Planning Metadata.** Detailed capability summary. Includes *what* it does and *with which tools*. Essential for Planner models. |
 | `system_instruction`| `str` | **Logic Guard.** Cached persistently. Must contain explicit tool-use instructions and deterministic rules. |
 | `temperature` | `float` | `0.0` (Deterministic) to `1.0` (Creative). Agent-level override. |
-| `guards` | `list` | List of `LogicGuards` (e.g. `["json", "straight"]`). |
 | `use_default_tools` | `bool` | Auto-loads Browser, File, OS, Terminal, and Python tools. |
 | `memory` | `str/cfg`| `"none"`, `"session"`, `"long_term"`, or a `MemoryConfig` object. |
 | `async_mode` | `bool` | **Performance Gate.** Enables parallel tool calls (Up to 60% faster). CRITICAL for scrapers/terminal use. |
-| `debug` | `bool` | **Reasoning Visibility.** Enables real-time **Industrial Logs** (`[TOOL]`, `[PLAN]`, `[GUARD]`). |
+| `debug` | `bool` | **Reasoning Visibility.** Enables real-time **Industrial Logs** (`[TOOL]`, `[PLAN]`). |
 | `verbose` | `bool` | **Audit Summary.** Enables a **Trace Summary** post-execution (Detailed timing/tokens). |
 
 ---
@@ -44,7 +43,7 @@ Understanding how to trigger an agent is key to preventing redundant loops or lo
 - **Nature**: One-off execution.
 - **Workflow**: 
     1. Send prompt.
-    2. Agent executes (with tools/guards).
+    2. Agent executes (with tools).
     3. Return final string.
 - **When to use**: Backend API calls, data extraction, or single-turn tasks where you don't need a back-and-forth conversation.
 
@@ -62,31 +61,10 @@ Understanding how to trigger an agent is key to preventing redundant loops or lo
 
 ---
 
-## 🛡️ 4. Logic Guardrails (Deterministic Output)
-
-Logic guards audit LLM outputs before they are delivered. If a guard fails, the agent is given an automated `[GUARD FAILURE]` message and **one chance to self-correct**.
-
-### Guard Registry:
-- **`json`**: Strictly valid JSON. Auto-removes markdown blocks before parsing.
-- **`straight`**: **Industrial Mode**. No emojis, no "I hope this helps" fluff, no conversational filler.
-- **`short`**: Maximum 3 sentences.
-- **`long`**: Minimum 5 sentences.
-- **`polite`**: Professional courtesy check.
-- **`happy`**: High-energy, positive tone.
-
-**Custom Guards:**
-```python
-def my_custom_guard(text: str):
-    if "Confidential" in text:
-        return "ERROR: You leaked confidential info. Remove it."
-    return True
-
-agent = Agent(guards=[my_custom_guard])
-```
 
 ---
 
-## 💾 5. Memory Mastery (Hierarchy & Tiers)
+## 💾 4. Memory Mastery (Hierarchy & Tiers)
 
 OrionAgent uses a **Dual-Layer Logic Engine** to manage context. This is the #1 way to save tokens in long-running sessions.
 
@@ -126,7 +104,7 @@ When building for an ecosystem, tune these for cost and precision:
 
 ---
 
-## ⚙️ 6. Advanced Internals: The Execution Lifecycle
+## ⚙️ 5. Advanced Internals: The Execution Lifecycle
 
 ### A. Tool Execution Flow (Sync vs Async)
 OrionAgent uses a **Parallel Tool Dispatcher**. When an agent calls multiple tools:
@@ -145,7 +123,7 @@ When using `strategy=["planning", "self_learn"]`:
 
 ---
 
-## 🖋️ 7. The Strategy Playbook
+## 🖋️ 6. The Strategy Playbook
 
 The `Manager` uses strategies to handle complex goals. You can chain them: `strategy=["planning", "self_learn"]`.
 
@@ -202,7 +180,7 @@ Control the "Safety Valve" of your orchestrator:
 
 ---
 
-## 🚀 8. Large-Scale Engineering Examples
+## 🚀 7. Large-Scale Engineering Examples
 
 ### Example A: The Autonomous Development Swarm
 A multi-agent setup where one agent plans, one codes, and one audits, with the Manager ensuring quality.
@@ -214,8 +192,8 @@ from orionagent import Agent, Manager, Gemini, chat
 llm = Gemini("gemini-2.0-flash", temperature=0.1, token_count=True, debug=True)
 
 # 2. Specialized Personnel
-researcher = Agent(name="Scraper", role="Researcher", use_default_tools=True, guards=["straight"])
-coder = Agent(name="Dev", role="Python Expert", use_default_tools=True, guards=["json"])
+researcher = Agent(name="Scraper", role="Researcher", use_default_tools=True)
+coder = Agent(name="Dev", role="Python Expert", use_default_tools=True)
 auditor = Agent(name="Sentry", role="QA Engineer", system_instruction="Find bugs and logic flaws.")
 
 # 3. Master Orchestrator
@@ -253,10 +231,7 @@ knowledge_cfg = MemoryConfig(
 )
 
 agent = Agent(
-    name="Archivist",
-    model=Gemini("gemini-2.0-flash"),
-    memory=knowledge_cfg,
-    guards=["json", "straight"]
+    memory=knowledge_cfg
 )
 
 # Facts extracted here will move to SQLite permanently
@@ -268,7 +243,7 @@ agent.ask("Who approved the Q1 budget?") # Auto-retrieves from SQLite
 
 ---
 
-## 🔍 9. Performance & Efficiency Tips
+## 🔍 8. Performance & Efficiency Tips
 
 1.  **Prefer `Gemini` for speed**: Its native caching makes it the fastest for high-tool use.
 2.  **Enable `async_mode`**: Always keep this True (default) for agents using terminal or web-scrapers to avoid blocking.
@@ -278,7 +253,7 @@ agent.ask("Who approved the Q1 budget?") # Auto-retrieves from SQLite
 
 ---
 
-## 💎 10. The "Kitchen Sink" Example (Pro Edition)
+## 💎 9. The "Kitchen Sink" Example (Pro Edition)
 
 ```python
 import os
@@ -304,7 +279,6 @@ auditor = Agent(
     name="Auditor",
     role="Security Specialist",
     model=llm,
-    guards=["straight", "json"],
     memory=long_term_memory
 )
 
@@ -323,7 +297,7 @@ chat(manager, greeting="Orion System Online. Deployment Authorized.")
 
 ---
 
-## 📚 11. Advanced Knowledge (RAG)
+## 📚 10. Advanced Knowledge (RAG)
 
 OrionAgent features an industrial-grade **Retrieval-Augmented Generation (RAG)** engine. This allows agents to ingest private documents (PDF, MD, TXT) and retrieve facts with semantic precision.
 
@@ -353,7 +327,7 @@ When an agent is initialized with `knowledge`, it automatically receives two hig
 
 ---
 
-## ⚡ 12. Performance & Token Optimization
+## ⚡ 11. Performance & Token Optimization
 
 OrionAgent is engineered to solve the "abstraction tax" of other frameworks.
 
@@ -366,7 +340,7 @@ OrionAgent is engineered to solve the "abstraction tax" of other frameworks.
 
 ---
 
-## 🛠️ 13. Tool Engineering (Best Practices)
+## 🛠️ 12. Tool Engineering (Best Practices)
 
 To ensure high-performance tool usage and prevent "Tool not found" or "Unavailable" refusals, follow these industrial patterns:
 
@@ -403,7 +377,7 @@ def my_custom_tool(param1: str, param2: int = 10):
 
 ---
 
-## 🐍 14. The Python Sandbox (Dynamic Reasoning)
+## 🐍 13. The Python Sandbox (Dynamic Reasoning)
 
 The `python_sandbox` is a first-class tool for industrial agents to verify logic, process data, and solve algorithmic challenges.
 
@@ -441,7 +415,7 @@ print(list(fib({n})))
 
 ---
 
-## 🤖 15. Industrial Persona Engineering
+## 🤖 14. Industrial Persona Engineering
 
 To ensure agents execute reliably without asking clarifying questions, their `system_instruction` must be engineered with explicit tool and agent awareness.
 
@@ -470,7 +444,7 @@ Your goal is to ensure a complete data loop: Discover, Extract, and Save."""
 
 ---
 
-## 🛠️ 16. Custom Tool Primacy (The Vibe Coder Path)
+## 🛠️ 15. Custom Tool Primacy (The Vibe Coder Path)
 
 While OrionAgent provides powerful default tools, high-precision industrial agents should prioritize **Custom Tools** built for specific tasks. This is the core of "Vibe Coding"—Human and AI collaborating to build the perfect toolkit.
 
@@ -489,7 +463,7 @@ While OrionAgent provides powerful default tools, high-precision industrial agen
 
 ---
 
-## 🎨 17. The Vibe Coding Manifesto: Build for the Planner
+## 🎨 16. The Vibe Coding Manifesto: Build for the Planner
 
 In AI-driven development (Vibe Coding), you aren't just writing code; you are building a **Swarm Ecosystem**. The Manager's planner chooses agents based on the **clarity of their metadata**.
 
