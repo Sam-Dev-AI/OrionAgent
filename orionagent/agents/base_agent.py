@@ -49,19 +49,24 @@ class Agent:
         tools: Optional[List[Tool]] = None,
         use_default_tools: bool = False,
         model: Optional[Union[str, ModelProvider]] = None,
-        memory: Union[str, Dict[str, Any], MemoryConfig] = "session",
+        memory: Union[str, Dict[str, Any], MemoryConfig] = "none",
         user_id: str = "default_user",
         strategy: Optional[Union[str, List[str]]] = None,
         max_refinements: int = 2,
-        verbose: bool = False,
+        verbose: Optional[bool] = None,
         async_mode: bool = True,
-        debug: bool = False,
+        debug: Optional[bool] = None,
         knowledge: Optional[Union[str, KnowledgeBase]] = None,
     ):
         self.name = name
         self.role = role
         self.description = description
-        self.system_instruction = system_instruction
+        
+        _META_INSTRUCTION = """RULES:
+1. Answer directly if you know the answer. Only use tools when necessary.
+2. Call multiple tools in parallel when possible.
+3. Keep responses concise and focused on the task."""
+        self.system_instruction = f"{_META_INSTRUCTION}\n\n{system_instruction}" if system_instruction else _META_INSTRUCTION
         self.async_mode = async_mode
         self.debug = debug
         
@@ -73,8 +78,9 @@ class Agent:
             
         self.user_id = user_id
         # Inherit verbose and debug from model if not explicitly set
-        self.verbose = verbose or (getattr(self.model, "verbose", False) if self.model else False)
-        self.debug = debug or (getattr(self.model, "debug", False) if self.model else False)
+        # Hierarchy: Explicit arg > Model-level > System Default (False)
+        self.verbose = verbose if verbose is not None else (getattr(self.model, "verbose", False) if self.model else False)
+        self.debug = debug if debug is not None else (getattr(self.model, "debug", False) if self.model else False)
 
         # --- Memory setup ---
         if isinstance(memory, MemoryConfig):
@@ -86,22 +92,27 @@ class Agent:
             self.memory_config = MemoryConfig(mode=memory)
             
         import os
-        self._session_manager = SessionManager(base_dir=self.memory_config.storage_path)
         
-        # Storage Selection (Hierarchical)
-        if self.memory_config.mode in ["persistent", "long_term", "chroma"]:
-            db_file = os.path.join(self.memory_config.storage_path, "orionagent.db")
-            # chroma mode is the ultimate level (SQLite + Chroma)
-            use_vdb = (self.memory_config.mode == "chroma")
-            self._persistent_db = SQLiteStorage(db_path=db_file, use_chroma=use_vdb)
-        else:
-            self._persistent_db = None
-
+        if self.memory_config.mode != "none":
+            self._session_manager = SessionManager(base_dir=self.memory_config.storage_path)
             
-        self._memory_pipeline = MemoryPipeline(self.memory_config, self._persistent_db)
-        
-        # Public proxy for developers to call agent.memory.view(), etc.
-        self.memory = AgentMemoryProxy(self)
+            # Storage Selection (Hierarchical)
+            if self.memory_config.mode in ["persistent", "long_term", "chroma"]:
+                db_file = os.path.join(self.memory_config.storage_path, "orionagent.db")
+                # chroma mode is the ultimate level (SQLite + Chroma)
+                use_vdb = (self.memory_config.mode == "chroma")
+                self._persistent_db = SQLiteStorage(db_path=db_file, use_chroma=use_vdb)
+            else:
+                self._persistent_db = None
+
+            self._memory_pipeline = MemoryPipeline(self.memory_config, self._persistent_db)
+            # Public proxy for developers to call agent.memory.view(), etc.
+            self.memory = AgentMemoryProxy(self)
+        else:
+            self._session_manager = None
+            self._persistent_db = None
+            self._memory_pipeline = None
+            self.memory = None
 
         # --- Tool setup ---
         self.tools = list(tools) if tools else []
@@ -130,6 +141,7 @@ class Agent:
         if self.memory_config.mode in ["persistent", "chroma"]:
             self.tools.append(SaveMemoryTool(self.memory, self.user_id))
             self.tools.append(SearchMemoryTool(self.memory, self.user_id))
+
 
     # ------------------------------------------------------------------
     # Default tools auto-loading
@@ -166,9 +178,13 @@ class Agent:
             trace_id = tracer.start_trace("agent_ask", self.name, task, verbose=self.verbose, debug=self.debug)
 
         # Session loading
-        sid = session_id or self._session_manager.auto(self.user_id, self.name)
-        session = self._session_manager.load(self.user_id, self.name, sid)
-        if not session:
+        if self._session_manager:
+            sid = session_id or self._session_manager.auto(self.user_id, self.name)
+            session = self._session_manager.load(self.user_id, self.name, sid)
+            if not session:
+                session = Session(self.user_id, self.name, sid)
+        else:
+            sid = session_id or "temp_session"
             session = Session(self.user_id, self.name, sid)
 
         # Update session priority if provided or use config default
@@ -217,12 +233,6 @@ class Agent:
                     if self.verbose and record_trace: 
                         tracer.print_summary()
                 return _trace_generator_strategy()
-                
-            if not stream:
-                if self.memory_config.mode != "none" and record_memory:
-                    self._memory_pipeline.process_turn(session, "assistant", res, self.model)
-                if trace_id:
-                    tracer.end_trace(trace_id, res)
             
             return res
 

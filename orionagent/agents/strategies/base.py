@@ -38,6 +38,8 @@ class BaseStrategy:
         record_trace: bool = True,
         hitl: Any = False,
         priority: Optional[str] = None,
+        manager_context: Optional[str] = None,
+        on_step_complete: Optional[Any] = None,
     ) -> Union[str, Generator[str, None, None], "AgentHandoff"]:
         """Run the strategy on *task* using the given *agents*.
 
@@ -46,6 +48,8 @@ class BaseStrategy:
             agents:  List of agents registered with the Manager.
             model:   The Manager-level model (for planning / eval calls).
             stream:  If True, yield chunks; if False, return full string.
+            manager_context: Global memory context from the Manager's session.
+            on_step_complete: Callback(agent_name, task, result) to record results into global memory.
         """
         raise NotImplementedError("Subclasses must implement execute().")
 

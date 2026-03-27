@@ -56,11 +56,8 @@ class ToolExecutor:
         trace_id = tracer.start_trace("tool_call_raw", tool_name, input_data)
         
         tools = tools or []
-        target = None
-        for t in tools:
-            if t.name == tool_name:
-                target = t
-                break
+        tool_map = {t.name: t for t in tools}
+        target = tool_map.get(tool_name)
 
         if target is None:
             res = f"Error: Tool '{tool_name}' not found."

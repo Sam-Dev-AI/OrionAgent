@@ -17,23 +17,27 @@ from orionagent.models.base_provider import ModelProvider
 
 
 _PLANNING_PROMPT = """[INDUSTRIAL PLANNER]
-1. Decompose task into 1-4 efficient steps using available agents.
-2. NEVER refuse a task. Always find a way to use tools to get closer to the goal.
-3. If the task is broad (e.g. "leads"), first DISCOVER, then EXTRACT.
+1. Decompose task into efficient steps using available agents.
+2. Respect USER CONSTRAINTS (allowed_agents, blocked_agents, force_agent).
+3. Output ONLY strict JSON. No markdown, no filler.
+
+Schema:
+{{
+  "plan": [
+    {{
+      "step_id": 1,
+      "task": "step description",
+      "agent": "agent_name",
+      "reason": "why this agent?"
+    }}
+  ],
+  "metadata": {{
+    "confidence": 0.9
+  }}
+}}
 
 Agents:
 {agents}
-
-[FEW-SHOT EXAMPLES]
-Task: "find hotels in NYC"
-Output: [[{{"s":"Discover hotels in NYC","a":"TheResearcher"}}], [{{"s":"Extract contacts for found hotels","a":"TheScraper"}}]]
-
-Task: "hotel leads in Mumbai without website"
-Output: [[{{"s":"Search for hotels in Mumbai likely to lack websites","a":"TheResearcher"}}], [{{"s":"Scrape contact details for the discovered list","a":"TheScraper"}}]]
-
-Output ONLY strict JSON: [[{{"s":"step_description","a":"agent_name"}},...], ...]
-(Outer array is sequence, inner array is parallel group).
-Dependent tasks MUST be in separate outer array blocks.
 
 Task: {task}"""
 
@@ -60,6 +64,8 @@ class PlanningStrategy(BaseStrategy):
         record_trace: bool = True,
         hitl: bool = False,
         priority: Optional[str] = None,
+        manager_context: Optional[str] = None,
+        on_step_complete: Optional[Any] = None,
 
     ) -> Union[str, Generator[str, None, None]]:
         from orionagent.tracing import tracer
@@ -67,7 +73,13 @@ class PlanningStrategy(BaseStrategy):
         if not model:
             # No model to plan with -- fall back to single delegation
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+
+        # Efficiency Gate: Check if planning is actually needed
+        if not self._requires_planning(task, agents, model, system_instruction, context, temperature, verbose, debug):
+            if verbose: print("\n[PLANNER] Skipping planning stage for simple task.")
+            from orionagent.agents.strategies.direct import DirectStrategy
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
         from orionagent.tracing import tracer
         trace_id = tracer.start_trace("plan", "Creating task plan", task, verbose=verbose, debug=debug)
@@ -83,8 +95,8 @@ class PlanningStrategy(BaseStrategy):
 
 
         if stream:
-            return self._stream_plan(plan, agents, task, model, async_mode, priority=priority, temperature=temperature)
-        return self._execute_plan_full(plan, agents, task, model, async_mode, priority=priority, temperature=temperature)
+            return self._stream_plan(plan, agents, task, model, async_mode, priority=priority, temperature=temperature, manager_context=manager_context, on_step_complete=on_step_complete, verbose=verbose)
+        return self._execute_plan_full(plan, agents, task, model, async_mode, priority=priority, temperature=temperature, manager_context=manager_context, on_step_complete=on_step_complete, verbose=verbose)
 
     # ------------------------------------------------------------------
     # Plan creation
@@ -120,7 +132,7 @@ class PlanningStrategy(BaseStrategy):
         )
         
         if debug:
-            print(f"\n[PLANNER RAW]: {raw}")
+            print(f"\n[ORCHESTRATOR RAW]: {raw}")
  
         # Parse -- strip markdown fences if the model wraps them
         raw_clean = raw.strip()
@@ -130,16 +142,36 @@ class PlanningStrategy(BaseStrategy):
             raw_clean = raw_clean.strip()
  
         try:
-            plan = json.loads(raw_clean)
+            data = json.loads(raw_clean)
+            if isinstance(data, dict) and "plan" in data:
+                plan = data["plan"]
+            elif isinstance(data, list):
+                plan = data
+            else:
+                plan = [{"task": task, "agent": None}]
         except json.JSONDecodeError as e:
-            print(f"[PLANNER ERROR] Failed to parse JSON: {e}")
-            # If parsing fails, fall back to single-agent routing
-            return [{"step": task, "agent": None}]
+            if verbose: print(f"[PLANNER ERROR] Failed to parse JSON: {e}")
+            return [{"task": task, "agent": None}]
 
         if not isinstance(plan, list) or not plan:
-            return [{"step": task, "agent": None}]
+            return [{"task": task, "agent": None}]
 
         return plan
+
+    def _requires_planning(
+        self,
+        task: str,
+        agents: List[Agent],
+        model: ModelProvider,
+        system_instruction: Optional[str] = None,
+        context: Optional[str] = None,
+        temperature: Optional[float] = None,
+        verbose: bool = False,
+        debug: bool = False,
+    ) -> bool:
+        """Quickly check if the task needs decomposition or can be handled as a single step."""
+        # Fast local checking instead of token-heavy LLM call
+        return self.is_complex_task(task)
 
     # ------------------------------------------------------------------
     # Plan execution
@@ -154,130 +186,144 @@ class PlanningStrategy(BaseStrategy):
         return agents[0]
 
     def _execute_plan_full(
-        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None
+        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, manager_context: Optional[str] = None, on_step_complete: Optional[Any] = None, verbose: bool = False
     ) -> str:
-        """Execute all plan steps and return ONLY the final result."""
-        import concurrent.futures
+        """Execute all plan steps and return a synthesized final result."""
+        results = []
         last_result = ""
-
-        # plan is now List[List[Dict]] (groups of parallel steps)
-        for group in plan:
-            # Safeguard: Trim context if it gets too large to save tokens
+        # Execute steps sequentially based on the new flat plan schema
+        for step in plan:
+            # Safeguard: Trim context
             if len(last_result) > 10000:
-                last_result = last_result[:5000] + "\n... [context truncated to save tokens] ...\n" + last_result[-5000:]
+                last_result = last_result[:5000] + "\n... [context truncated] ...\n" + last_result[-5000:]
             
-            if not isinstance(group, list):
-                group = [group] # robustness for single-step legacy or malformed plans
-                
-            if len(group) == 1 or not async_mode:
-                # Single step in group or async disabled, run sequentially
-                for step in group:
-                    instruction = step.get("s", step.get("step", original_task))
-                    agent = self._find_agent(step.get("a", step.get("agent")), agents)
-                    prompt = f"### DATA CONTEXT FROM PREVIOUS STEPS ###\n{last_result}\n\n### YOUR CURRENT TASK ###\n{instruction}\n\nINSTRUCTION: Process the data context above to fulfill your task. If data is missing, use your tools to find it. DO NOT ASK QUESTIONS." if last_result else instruction
-                    last_result = agent.ask(
-                        task=prompt, 
-                        stream=False, 
-                        use_strategy=False, 
-                        record_memory=False, 
-                        record_trace=True, 
-                        priority=priority, 
-                        temperature=temperature
-                    )
-            else:
-                # Parallel group
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    futures = []
-                    for step in group:
-                        instruction = step.get("s", step.get("step", original_task))
-                        agent = self._find_agent(step.get("a", step.get("agent")), agents)
-                        prompt = f"### DATA CONTEXT FROM PREVIOUS STEPS ###\n{last_result}\n\n### YOUR CURRENT TASK ###\n{instruction}\n\nINSTRUCTION: Process the data context above to fulfill your task. If data is missing, use your tools to find it. DO NOT ASK QUESTIONS." if last_result else instruction
-                        futures.append(executor.submit(
-                            agent.ask, 
-                            task=prompt, 
-                            stream=False, 
-                            use_strategy=False, 
-                            record_memory=False, 
-                            record_trace=True, 
-                            priority=priority, 
-                            temperature=temperature
-                        ))
-                    
-                    results = [f.result() for f in concurrent.futures.as_completed(futures)]
-                    last_result = "\n".join(str(r) for r in results if r is not None)
+            # Robustness for either old or new step keys
+            instruction = step.get("task", step.get("s", step.get("step", original_task)))
+            agent_name = step.get("agent", step.get("a", "Unknown"))
+            agent = self._find_agent(agent_name, agents)
+            
+            # Build prompt with global context + step context
+            prompt_parts = []
+            if manager_context:
+                prompt_parts.append(f"### GLOBAL CONTEXT ###\n{manager_context}")
+            if last_result:
+                prompt_parts.append(f"### PREVIOUS STEP CONTEXT ###\n{last_result}")
+            prompt_parts.append(f"### TASK ###\n{instruction}")
+            prompt = "\n\n".join(prompt_parts)
+            
+            last_result = agent.ask(
+                task=prompt,
+                stream=False,
+                use_strategy=False,
+                record_memory=False,
+                record_trace=True,
+                priority=priority,
+                temperature=temperature
+            )
+            # Record step result into Manager's global memory
+            if on_step_complete:
+                on_step_complete(agent_name, instruction, last_result)
+            
+            results.append({"agent": agent_name, "task": instruction, "output": last_result})
 
-        return last_result
+        # Final Aggregation / Synthesis Layer
+        return self._synthesize_results(original_task, results, model, verbose=verbose)
 
     def _stream_plan(
-        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None
+        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, manager_context: Optional[str] = None, on_step_complete: Optional[Any] = None, verbose: bool = False
     ) -> Generator[str, None, None]:
-        """Stream plan execution, yielding ONLY the final step's result."""
-        import concurrent.futures
+        """Stream plan execution, yielding debug info and the final synthesized result."""
+        results = []
         last_result = ""
-        
-        for i, group in enumerate(plan, 1):
-            # Safeguard: Trim context if it gets too large to save tokens
+        for i, step in enumerate(plan, 1):
             if len(last_result) > 10000:
-                last_result = last_result[:5000] + "\n... [context truncated to save tokens] ...\n" + last_result[-5000:]
+                last_result = last_result[:5000] + "\n... [context truncated] ...\n" + last_result[-5000:]
                 
-            if not isinstance(group, list):
-                group = [group]
-                
-            is_final_group = (i == len(plan))
+            instruction = step.get("task", step.get("s", step.get("step", original_task)))
+            agent_name = step.get("agent", step.get("a", "Unknown"))
+            agent = self._find_agent(agent_name, agents)
             
-            if len(group) == 1 or not async_mode:
-                for step_idx, step in enumerate(group):
-                    instruction = step.get("s", step.get("step", original_task))
-                    agent_name = step.get("a", step.get("agent", "Unknown"))
-                    agent = self._find_agent(agent_name, agents)
-                    
-                    yield f"\n\033[1m[STEP {i}] {agent_name}: {instruction}\033[0m\n"
-                    
-                    prompt = f"### DATA CONTEXT FROM PREVIOUS STEPS ###\n{last_result}\n\n### YOUR CURRENT TASK ###\n{instruction}\n\nINSTRUCTION: Process the data context above to fulfill your task. If data is missing, use your tools to find it. DO NOT ASK QUESTIONS." if last_result else instruction
-                    
-                    step_res = ""
-                    for chunk in agent.ask(
-                        task=prompt, 
-                        stream=True, 
-                        use_strategy=False, 
-                        record_memory=False, 
-                        record_trace=True, 
-                        priority=priority, 
-                        temperature=temperature
-                    ):
-                        step_res += chunk
-                        yield chunk
-                    
-                    last_result = step_res
-                    yield "\n"
-            else:
-                # Parallel group execution
-                yield f"\n\033[1m[STEP {i}] Parallel Execution Group\033[0m\n"
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    futures = []
-                    for step in group:
-                        instruction = step.get("s", step.get("step", original_task))
-                        agent_name = step.get("a", step.get("agent", "Unknown"))
-                        agent = self._find_agent(agent_name, agents)
-                        prompt = f"Previous result: {last_result}\n\nTask: {instruction}" if last_result else instruction
-                        futures.append(executor.submit(
-                            agent.ask, 
-                            task=prompt, 
-                            stream=False, 
-                            use_strategy=False, 
-                            record_memory=False, 
-                            record_trace=True, 
-                            priority=priority, 
-                            temperature=temperature
-                        ))
-                    
-                    results = []
-                    for future in concurrent.futures.as_completed(futures):
-                        res = future.result()
-                        results.append(res)
-                        yield f"- {res}\n"
-                    
-                    last_result = "\n".join(results)
+            # Only show visual headers if verbose is enabled
+            if verbose:
+                yield f"\n\033[1m[STEP {i}] {agent_name}: {instruction}\033[0m\n"
+            
+            # Build prompt with global context + step context
+            prompt_parts = []
+            if manager_context:
+                prompt_parts.append(f"### GLOBAL CONTEXT ###\n{manager_context}")
+            if last_result:
+                prompt_parts.append(f"### PREVIOUS STEP CONTEXT ###\n{last_result}")
+            prompt_parts.append(f"### TASK ###\n{instruction}")
+            prompt = "\n\n".join(prompt_parts)
+            
+            step_res = ""
+            for chunk in agent.ask(
+                task=prompt, 
+                stream=True, 
+                use_strategy=False, 
+                record_memory=False, 
+                record_trace=True, 
+                priority=priority, 
+                temperature=temperature
+            ):
+                step_res += chunk
+                # Still yield agent chunks to keep the stream alive, but user wanted "clean"
+                # We can wrap them in a debug marker or just yield them if verbose
+                if verbose:
+                    yield chunk
+            
+            last_result = step_res
+            # Record step result into Manager's global memory
+            if on_step_complete:
+                on_step_complete(agent_name, instruction, step_res)
+            
+            results.append({"agent": agent_name, "task": instruction, "output": step_res})
+            if verbose:
+                yield "\n"
+
+        # Final Aggregation / Synthesis Layer (Streaming)
+        if verbose:
+            yield "\n\033[1m[FINAL SYNTHESIS]\033[0m\n"
+        
+        final_answer = self._synthesize_results(original_task, results, model, verbose=verbose)
+        
+        # Format as JSON if required by user feedback (standardizing)
+        res_obj = {
+            "final_answer": final_answer,
+            "trace": results if verbose else []
+        }
+        
+        # If output needs to be a clean string, just yield the answer. 
+        # But user requested JSON format: { "final_answer": "..." }
+        yield json.dumps(res_obj, indent=2)
+
+    def _synthesize_results(self, original_task: str, results: List[dict], model: Any, verbose: bool = False) -> str:
+        """Combine all agent outputs into one coherent final response."""
+        if not model:
+            return results[-1]["output"] if results else "No results."
+
+        # Filter out empty or meta-only outputs
+        data_text = "\n\n".join([f"Agent ({r['agent']}): {r['output'][:5000]}" for r in results])
+        
+        prompt = (
+            f"You are a master synthesiser. Based on the following research/work results, "
+            f"provide a clean, professional, and comprehensive final answer to the user's original task.\n\n"
+            f"ORIGINAL TASK: {original_task}\n\n"
+            f"AGENT RESULTS:\n{data_text}\n\n"
+            f"### FINAL ANSWER ###"
+        )
+        
+        system_instruction = (
+            "You are a master synthesiser. Join all agent results into a single, cohesive, "
+            "and clean final response. NO conversational filler. NO markers like 'Synthesised Result:'. "
+            "Just the clean answer."
+        )
+        
+        try:
+            return model.generate(prompt=prompt, system_instruction=system_instruction)
+        except Exception as e:
+            if verbose: print(f"[SYNTHESIS ERROR] {e}")
+            return results[-1]["output"] if results else "Error during synthesis."
                         
     def _approve_plan(self, plan: list, original_task: str, h_cfg: "HitlConfig") -> bool:
         """Interactive terminal approval for the generated plan."""

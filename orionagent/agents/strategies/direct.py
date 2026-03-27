@@ -31,9 +31,15 @@ class DirectStrategy(BaseStrategy):
         record_trace: bool = True,
         hitl: bool = False,
         priority: Optional[str] = None,
+        manager_context: Optional[str] = None,
+        on_step_complete: Optional[Any] = None,
     ) -> Union[str, Generator[str, None, None], Any]:
 
         prompt = f"{context}\n\n==== CURRENT TASK ====\n{task}" if context else task
+        
+        # Inject global memory context from Manager into the agent prompt
+        if manager_context:
+            prompt = f"### GLOBAL CONTEXT ###\n{manager_context}\n\n{prompt}"
 
         # If there's only one agent, skip keyword overhead entirely
         if len(agents) == 1:
@@ -68,7 +74,15 @@ class DirectStrategy(BaseStrategy):
                 raise InterruptedError("Delegation rejected by user via HITL.")
 
         if stream:
-            return self._stream_response(selected, prompt, model, record_trace=record_trace, priority=priority, temperature=temperature)
+            def _stream_and_record():
+                full_res = []
+                for chunk in self._stream_response(selected, prompt, model, record_trace=record_trace, priority=priority, temperature=temperature):
+                    full_res.append(chunk)
+                    yield chunk
+                # Record result into Manager's global memory
+                if on_step_complete:
+                    on_step_complete(selected.name, task, "".join(full_res))
+            return _stream_and_record()
         
         result = selected.ask(
             task=prompt, 
@@ -79,6 +93,9 @@ class DirectStrategy(BaseStrategy):
             priority=priority, 
             temperature=temperature
         )
+        # Record result into Manager's global memory
+        if on_step_complete:
+            on_step_complete(selected.name, task, result)
         return result
 
     def _approve_direct(self, task: str, agent_name: str, h_cfg: "HitlConfig") -> bool:

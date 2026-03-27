@@ -25,7 +25,9 @@ class MemoryPipeline:
         tracer.log_event("memory", f"Storing {role} turn", display_content, verbose=is_verbose, debug=is_debug)
 
         session.messages.append({"role": role, "content": content})
-        self.session_manager.save(session)
+        # Batch saves: only save to disk every 3 messages or if it's the first message
+        if len(session.messages) % 3 == 0 or len(session.messages) == 1:
+            self.session_manager.save(session)
         
         # Layered Summarization Logic
         # 1. Maintain a very small Dialogue Layer (e.g. 6 messages)
@@ -196,13 +198,13 @@ class MemoryPipeline:
                 min_importance=self.config.importance_threshold
             )
             if facts:
-                context_parts.append("### LTM:")
+                context_parts.append("[LTM]")
                 for f in facts:
                     context_parts.append(f"- {f['content']}")
                     
         # 2. Structured Entities/Facts (High priority)
         if self.config.extract_entities and session.entities:
-            context_parts.append("\n### FACTS:")
+            context_parts.append("\n[FACTS]")
             for name, data in session.entities.items():
                 cat = data.get("category", "General")
                 val = data.get("value", "")
@@ -210,23 +212,23 @@ class MemoryPipeline:
 
         # 3. Global Recap (Layer 4)
         if session.session_summary:
-            context_parts.append("\n### GLOBAL RECAP:")
+            context_parts.append("\n[GLOBAL]")
             context_parts.append(session.session_summary[:self.config.max_global_summary_tokens * 4])
             
         # 4. Chunk Summaries (Layer 3)
         if session.chunk_summaries:
-            context_parts.append("\n### ARCHIVED CHUNKS:")
+            context_parts.append("\n[CHUNKS]")
             for chunk in session.chunk_summaries[-3:]: # Only latest 3 chunks
                 context_parts.append(f"- {chunk[:self.config.max_chunk_tokens * 4]}")
                 
         # 5. Recent Detailed Summary (Layer 2)
         if session.recent_summary:
-            context_parts.append("\n### RECENT DETAILS:")
+            context_parts.append("\n[RECENT]")
             context_parts.append(session.recent_summary[:self.config.max_recent_summary_tokens * 4])
                 
         # 6. Working Dialogue (Layer 1 - Raw)
         if session.messages:
-            context_parts.append("\n### LATEST DIALOGUE:")
+            context_parts.append("\n[DIALOGUE]")
             # Apply strict limit to raw dialogue with per-message truncation
             remaining_budget = self.config.max_dialogue_tokens
             

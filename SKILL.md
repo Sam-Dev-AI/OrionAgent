@@ -14,6 +14,37 @@ OrionAgent follows a hierarchical execution model:
 -   **Manager Layer**: The "Architect". Orchestrates multiple agents using recursive planning and evaluation strategies.
 -   **Memory Layer**: Hierarchical storage ranging from fast session buffers to persistent SQLite knowledge vaults.
 
+### Multi-Agent Memory Architecture
+
+OrionAgent uses a **3-Tier Memory Architecture** for multi-agent systems:
+
+| Tier | Owner | Storage | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Global Memory** | Manager | SQLite + JSON | Cross-agent knowledge hub. Records all agent delegation results. |
+| **Local Memory** | Each Agent | Session buffer (JSON) | Agent's own conversation history. Fully isolated per agent. |
+| **Shared Memory** | Optional | ChromaDB (Vector) | Semantic RAG via `KnowledgeBase`. Shared across agents if configured. |
+
+#### Working of Multi-Agent Memory
+
+The Manager acts as the **Global Hub**, ensuring that intelligence gathered by one agent is available to the next step in a mission.
+
+1.  **Global Context Injection**:
+    -   Before any delegation, the Manager builds a condensed **Global Briefing** from its persistent session (extracting entities, recent summaries, and archived chunks).
+    -   This is injected into the selected agent's prompt as `### GLOBAL CONTEXT ###`.
+    -   *Result*: The agent is aware of previous agent activities and extracted facts without needing to read the entire raw history.
+
+2.  **Result Recording Callback**:
+    -   Every strategy (`planning`, `direct`, `self_learn`) uses a callback mechanism to report results back to the Manager.
+    -   The Manager records these results as "Assistant Turns" in its own session.
+    -   *Result*: The Global Memory grows dynamically as the mission progresses, creating an automated knowledge loop.
+
+3.  **Local Isolation**:
+    -   Agents strictly use their own **Local Memory** for their internal tool reasoning loops.
+    -   This prevents "context pollution" where the Manager's high-level goals might confuse an agent's low-level tool execution logic.
+
+**Result**: True autonomous collaboration where agents "share a brain" via the Manager's Global Memory hub.
+
+
 ---
 
 ## 🛠️ 2. The Agent Master List (Variables)
@@ -57,7 +88,9 @@ Understanding how to trigger an agent is key to preventing redundant loops or lo
 
 ### C. `manager.chat(greeting)`
 - **The Orchestration Loop**: Unlike a single agent, the `Manager`'s `.chat()` triggers the **Strategy Engine**. 
-- If `strategy=["planning", "self_learn"]` is set, every message you send triggers a full planning/execution/evaluation cycle before the Manager responds.
+- If `strategy="planning"` is set, every message you send triggers the **Strategic Orchestration Loop**:
+    1. **Efficiency Gate**: Manager checks if the task is simple (Skip Plan) or complex (Full Plan).
+    2. **Orchestration**: If complex, it generates a multi-step JSON roadmap for agents.
 
 ---
 
@@ -123,25 +156,44 @@ When using `strategy=["planning", "self_learn"]`:
 
 ---
 
-## 🖋️ 6. The Strategy Playbook
+## 🚀 5. Manager: The Sovereign Orchestrator
 
-The `Manager` uses strategies to handle complex goals. You can chain them: `strategy=["planning", "self_learn"]`.
+The `Manager` is the technical "Brain" of your swarm. Its sole purpose is to decompose high-level goals into executable roadmaps and delegate them to specialized personnel.
 
-### 1. `direct` (Default)
-- **When to use**: Simple routing. "Who is best for task X?"
-- **Behavior**: Single delegation to one agent. Minimal overhead.
+### A. The "Behavior Lock" (Strict Orchestration)
+OrionAgent enforces a strict **Behavior Lock** on the Manager. It is a **Planner**, not an **Executor**. 
+- **Role**: Conductor / Architect.
+- **Strict Rule**: It never writes code, searches the web, or performs tasks directly.
+- **Output**: It generates a structured JSON roadmap for its workers to follow.
 
-### 2. `planning`
-- **When to use**: Complex, multi-step goals.
-- **Behavior**: Decomposes the goal into a roadmap. Groups non-dependent tasks for **parallel execution** via `async_mode`.
+### B. Core Orchestration Strategies
+The `strategy` parameter determines how the Manager processes your intent.
 
-### 3. `self_learn` (The Verdict Loop)
-- **When to use**: High-stakes quality control.
-- **Behavior**:
-    1.  Delegates task to an agent.
-    2.  Evaluates the result against the goal.
-    3.  If quality fails, it provides feedback and **re-delegates** with corrected context.
-    4.  Repeats up to `max_refinements`.
+| Strategy | Mode | Best For | Behavior |
+| :--- | :--- | :--- | :--- |
+| `None` | **Direct** | Simple Routing | Fast, one-step delegation to the best agent. |
+| `"planning"`| **Strategic**| Complex Goals | Decomposes task into a multi-step JSON plan. |
+
+### C. The Efficiency Gate (Auto-Skip)
+When using `"planning"`, the Manager maintains an internal **Efficiency Gate**.
+1. **Analyze**: It first checks if the task is complex.
+2. **Skip**: Simple tasks (greetings, one-shot questions) skip the planning phase entirely.
+3. **Plan**: Only complex, multi-step goals trigger the full orchestrator.
+**Result**: Industrial reliability for complex work, zero-latency for simple interactions.
+
+### D. Runtime Agent Constraints
+Apply surgical control over the agent pool during execution using `manager.ask()`:
+
+```python
+# Force a specific specialist
+manager.ask("Draft a legal report", force_agent="Lawyer")
+
+# Exclude specific roles
+manager.ask("Debug this script", blocked_agents=["Researcher"])
+
+# Use only a subset
+manager.ask("Market analysis", allowed_agents=["Scraper", "Analyst"])
+```
 
 ### 4. `hitl` (Human-in-the-Loop)
 - **When to use**: High-risk task execution (e.g. cloud deletion, sending emails, large purchases).
@@ -196,15 +248,18 @@ researcher = Agent(name="Scraper", role="Researcher", use_default_tools=True)
 coder = Agent(name="Dev", role="Python Expert", use_default_tools=True)
 auditor = Agent(name="Sentry", role="QA Engineer", system_instruction="Find bugs and logic flaws.")
 
-# 3. Master Orchestrator
+# 3. Master Orchestrator (Behavior Lock)
 manager = Manager(
     model=llm,
     agents=[researcher, coder, auditor],
-    strategy=["planning", "self_learn"], # Plan first, then ensure quality
-    async_mode=True,                     # Run non-dependent research in parallel
+    strategy="planning",                 # Enable Structured JSON Orchestration
     verbose=True                         # Get a full token/time report at the end
 )
 
+# Efficiency Gate: Simple greetings skip planning automatically
+manager.chat("Hello team!")
+
+# Full Orchestration: Complex goals trigger the JSON roadmap
 manager.chat("Build a secure file-encryptor with AES-256 and unit tests.")
 ```
 
@@ -246,8 +301,9 @@ agent.ask("Who approved the Q1 budget?") # Auto-retrieves from SQLite
 ## 🔍 8. Performance & Efficiency Tips
 
 1.  **Prefer `Gemini` for speed**: Its native caching makes it the fastest for high-tool use.
-2.  **Enable `async_mode`**: Always keep this True (default) for agents using terminal or web-scrapers to avoid blocking.
-3.  **Tiered Priority**: If your agent has 100s of turns, switch to `priority="low"` occasionally to prune the context window.
+2.  **Use `strategy="planning"` for complex goals**: It provides a strict, structured roadmap for specialized agents.
+3.  **Efficiency Gate**: OrionAgent's `PlanningStrategy` automatically bypasses the planning phase for simple tasks (detected via heuristic + ultra-fast analyzer call), saving ~4s of overhead.
+4.  **Agent Constraints**: Use `allowed_agents`, `blocked_agents`, and `force_agent` in `manager.ask()` for granular control over delegation.
 4.  **Token Counting**: Always use `token_count=True` during development to identify "heavy" prompts or strategies.
 5.  **Industrial Logs**: Use `debug=True` to find exactly where an agent is getting stuck in a loop or tool call.
 
@@ -282,13 +338,12 @@ auditor = Agent(
     memory=long_term_memory
 )
 
-# 4. Master Engine
+# 4. Master Engine (Behavior Lock)
 manager = Manager(
     model=llm,
     agents=[auditor],
-    strategy=["planning", "self_learn"],
-    max_refinements=3,
-    async_mode=True
+    strategy="planning",                 # Enable Structured JSON Orchestration
+    verbose=True
 )
 
 # 5. Launch

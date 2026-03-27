@@ -25,7 +25,7 @@ _STRATEGY_MAP = {
 
 
 def get_strategy(
-    strategy: Union[str, List[str], None] = "planning",
+    strategy: Union[str, List[str], None] = None,
     **kwargs,
 ) -> BaseStrategy:
     """Create a strategy instance from a keyword or list of keywords.
@@ -45,7 +45,7 @@ def get_strategy(
         ValueError: If an unknown strategy name is given.
     """
     if strategy is None:
-        return PlanningStrategy()
+        return DirectStrategy()
 
     # Normalise to a list
     if isinstance(strategy, str):
@@ -93,23 +93,23 @@ class _CombinedPlanLearnStrategy(BaseStrategy):
         self._planner = PlanningStrategy()
         self._learner = SelfLearnStrategy(max_refinements=max_refinements)
 
-    def execute(self, task, agents, model, system_instruction=None, context=None, temperature=None, tools=None, stream=True, async_mode=True, verbose=False, debug=False, record_trace=True, hitl=False, priority=None):
+    def execute(self, task, agents, model, system_instruction=None, context=None, temperature=None, tools=None, stream=True, async_mode=True, verbose=False, debug=False, record_trace=True, hitl=False, priority=None, manager_context=None, on_step_complete=None):
         # Fast bypass for simple conversational tasks
         if not self.is_complex_task(task):
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
         if not model:
-            return self._planner.execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority)
+            return self._planner.execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
         # Step 1: Create a plan using the planning strategy
         plan = self._planner._create_plan(task, agents, model, system_instruction, context, temperature, verbose=verbose, debug=debug)
 
         if stream:
-            return self._stream_combined(plan, agents, model, task, system_instruction, verbose=verbose, debug=debug, record_trace=record_trace, hitl=hitl, priority=priority)
-        return self._execute_combined(plan, agents, model, task, system_instruction, verbose=verbose, debug=debug, record_trace=record_trace, hitl=hitl, priority=priority)
+            return self._stream_combined(plan, agents, model, task, system_instruction, verbose=verbose, debug=debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+        return self._execute_combined(plan, agents, model, task, system_instruction, verbose=verbose, debug=debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
-    def _execute_combined(self, plan, agents, model, original_task, system_instruction=None, verbose=False, debug=False, record_trace=True, hitl=False, priority=None):
+    def _execute_combined(self, plan, agents, model, original_task, system_instruction=None, verbose=False, debug=False, record_trace=True, hitl=False, priority=None, manager_context=None, on_step_complete=None):
         """Execute plan groups and return ONLY the final result."""
         import concurrent.futures
         last_result = ""
@@ -162,7 +162,7 @@ class _CombinedPlanLearnStrategy(BaseStrategy):
 
         return last_result
 
-    def _stream_combined(self, plan, agents, model, original_task, system_instruction=None, verbose=False, debug=False, record_trace=True, hitl=False, priority=None):
+    def _stream_combined(self, plan, agents, model, original_task, system_instruction=None, verbose=False, debug=False, record_trace=True, hitl=False, priority=None, manager_context=None, on_step_complete=None):
         """Stream plan groups, yielding ONLY the final group's result."""
         import concurrent.futures
         last_result = ""

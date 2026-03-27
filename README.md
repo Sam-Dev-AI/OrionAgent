@@ -109,15 +109,17 @@ writer = Agent(
     system_instruction="Synthesize complex data into premium reports."
 )
 
-# 3. Link via Manager
+# 3. Link via Manager (Task Orchestrator)
 manager = Manager(
     model=llm,
     agents=[researcher, writer],
-    strategy=["planning", "self_learn"], # Plan -> Execute -> Evaluate -> Correct
-    temperature=0.3                      # Global override for orchestration
+    strategy="planning",           # Enable Structured Behavior Lock
+    verbose=True
 )
 
-manager.chat("Draft a technical report on 2024 industrial AI trends.")
+# OrionAgent automatically detects task complexity.
+# Simple greetings skip planning, while complex research triggers orchestration.
+manager.chat("Research Gemini 1.5 Pro features and summarize why they matter.")
 ```
 
 
@@ -320,38 +322,41 @@ Decoupled execution architecture for zero-latency orchestration.
 
 ## Memory Architecture & Patterns
 
-Managed through a **Dual-Tier Synchronizer**, OrionAgent maintains state across thousands of interactions without context saturation.
+Managed through a **Hierarchical 3-Tier Synchronizer**, OrionAgent maintains state across thousands of interactions without context saturation, enabling seamless multi-agent collaboration.
+
+### The 3-Tier Multi-Agent Memory
+
+| Tier | Owner | Storage | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Global Memory** | Manager | SQLite + JSON | Cross-agent knowledge hub. Records all agent delegation results. |
+| **Local Memory** | Each Agent | Session buffer (JSON) | Agent's own conversation history. Fully isolated per agent. |
+| **Shared Memory** | Optional | ChromaDB (Vector) | Semantic RAG via `KnowledgeBase`. Shared across agents if configured. |
 
 ### Data Synchronization Flow (The Memory Engine)
 ```mermaid
 graph TD
-    User([User Signal]) --> Sync{Memory Synchronizer}
+    User([User Signal]) --> Sync{Manager: Global Hub}
     
-    subgraph Level 2: Session
-        Sync --> Buffer[Short-Term Buffer]
+    subgraph Multi-Agent Swarm
+        Sync -- 1. Record Result --> SQL[(SQLite Global Vault)]
+        Sync -- 2. Inject Context --> AgentA[Agent A: Local Memory]
+        Sync -- 2. Inject Context --> AgentB[Agent B: Local Memory]
     end
     
-    subgraph Level 3: Long-Term
-        Sync --> Extract[Entity Extractor]
-        Extract --> SQL[(SQLite Knowledge Vault)]
+    subgraph Shared Level: Ultimate
+        AgentA -- Query --> Chroma[(Chroma Vector DB)]
+        AgentB -- Query --> Chroma
     end
     
-    subgraph Level 4: Ultimate
-        Sync --> Embedding[Semantic Embedder]
-        Embedding --> Chroma[(Chroma Vector DB)]
-    end
-    
-    Buffer -- Recall --> Hub[Intelligence Hub]
-    SQL -- Structured Recall --> Hub
-    Chroma -- Semantic RAG Recall --> Hub
-    
-    Hub --> Agent[Agent Output]
+    SQL -- Recall --> Hub[Intelligence Hub]
+    Hub --> Final[Orchestrated Output]
 ```
 
 ### State Storage Metrics
-*   **Session Buffer**: Retains exact raw inputs for immediate task context.
-*   **Knowledge Tier**: Distills large data volumes into concise **Knowledge Briefs**.
-*   **Fact Isolation**: Multi-tenant data separation via `user_id` mapping.
+*   **Global Knowledge Briefing**: The Manager builds a condensed summary (entities, summaries, history) from the Global Memory vault, injecting it as `### GLOBAL CONTEXT ###` into every agent delegation.
+*   **Isolated Local Context**: Agents retain their own conversation buffers (Local Memory) so that task-specific details don't pollute the global state unless necessary.
+*   **Semantic Recall (Chroma)**: Level 4 memory enables RAG-as-a-Service, where all swarm agents can query a shared knowledge base (Shared Memory).
+
 
 ---
 

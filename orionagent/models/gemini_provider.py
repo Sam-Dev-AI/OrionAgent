@@ -36,6 +36,9 @@ class Gemini(ModelProvider):
 
         from google import genai
         self._client = genai.Client(api_key=self.api_key)
+        
+        from orionagent.tools.tool_executor import ToolExecutor
+        self._tool_executor = ToolExecutor()
 
 
     # ------------------------------------------------------------------
@@ -134,9 +137,6 @@ class Gemini(ModelProvider):
                 return get_text(content)
 
             # Process Tool Calls
-            from orionagent.tools.tool_executor import ToolExecutor
-            executor = ToolExecutor()
-            
             tool_parts = []
             for part in content.parts:
                 if part.function_call:
@@ -144,7 +144,7 @@ class Gemini(ModelProvider):
                     args = part.function_call.args
                     if self.verbose:
                         print(f"\033[94m[TOOL CALL: {name}({args})]\033[0m")
-                    res = executor.execute(name, args, tools)
+                    res = self._tool_executor.execute(name, args, tools)
                     tool_parts.append(
                         types.Part(function_response=types.FunctionResponse(name=name, response={"result": res}))
                     )
@@ -213,15 +213,12 @@ class Gemini(ModelProvider):
                 break
 
             # Execute tools and add results to history
-            from orionagent.tools.tool_executor import ToolExecutor
-            executor = ToolExecutor()
-            
             tool_parts = []
             for part in current_content_parts:
                 if part.function_call:
                     name = part.function_call.name
                     args = part.function_call.args
-                    res = executor.execute(name, args, tools)
+                    res = self._tool_executor.execute(name, args, tools)
                     tool_parts.append(
                         types.Part(function_response=types.FunctionResponse(name=name, response={"result": res}))
                     )
