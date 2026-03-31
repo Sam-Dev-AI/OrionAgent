@@ -40,9 +40,17 @@ class Model:
         streaming: bool = True,
         verbose: bool = False,
         debug: bool = False,
+        thinking: bool = False,
+        show_thinking: bool = True,
     ) -> ModelProvider:
         # Build kwargs, only passing values that were explicitly provided
-        kwargs = {"streaming": streaming, "verbose": verbose, "debug": debug}
+        kwargs = {
+            "streaming": streaming,
+            "verbose": verbose,
+            "debug": debug,
+            "thinking": thinking,
+            "show_thinking": show_thinking
+        }
         if model is not None:
             kwargs["model_name"] = model
         if api_key is not None:

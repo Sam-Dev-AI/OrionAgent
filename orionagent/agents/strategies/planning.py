@@ -14,6 +14,7 @@ from typing import Generator, List, Optional, Union, Any
 from orionagent.agents.base_agent import Agent
 from orionagent.agents.strategies.base import BaseStrategy
 from orionagent.models.base_provider import ModelProvider
+from orionagent.agents.hitl import is_risky_action
 
 
 _PLANNING_PROMPT = """[INDUSTRIAL PLANNER]
@@ -90,7 +91,7 @@ class PlanningStrategy(BaseStrategy):
         if hitl:
             from orionagent.agents.hitl import HitlConfig
             h_cfg = hitl if isinstance(hitl, HitlConfig) else HitlConfig()
-            if not self._approve_plan(plan, task, h_cfg):
+            if not self._approve_plan(plan, task, h_cfg, model=model):
                 raise InterruptedError("Plan rejected by user via HITL.")
 
 
@@ -120,7 +121,16 @@ class PlanningStrategy(BaseStrategy):
             f"- {a.name} ({a.role}): {a.description}. Tools: {[t.name for t in a.tools]}" for a in agents
         )
         
-        prompt_task = f"{context}\n\n==== CURRENT TASK ====\n{task}" if context else task
+        if context:
+            prompt_task = (
+                f"{context}\n\n"
+                f"==== ACTIVE TASK ====\n"
+                f"IMPORTANT: The context above is for reference ONLY. "
+                f"Plan for the following request:\n\n"
+                f"{task}"
+            )
+        else:
+            prompt_task = task
         prompt = _PLANNING_PROMPT.format(agents=roster, task=prompt_task)
         
         si = system_instruction + "\n\nReply with valid JSON only. No markdown, no explanation." if system_instruction else "Reply with valid JSON only. No markdown, no explanation."
@@ -325,7 +335,7 @@ class PlanningStrategy(BaseStrategy):
             if verbose: print(f"[SYNTHESIS ERROR] {e}")
             return results[-1]["output"] if results else "Error during synthesis."
                         
-    def _approve_plan(self, plan: list, original_task: str, h_cfg: "HitlConfig") -> bool:
+    def _approve_plan(self, plan: list, original_task: str, h_cfg: "HitlConfig", model: Optional[ModelProvider] = None) -> bool:
         """Interactive terminal approval for the generated plan."""
         if h_cfg.permission_level == "high":
             return True
@@ -333,10 +343,10 @@ class PlanningStrategy(BaseStrategy):
         if h_cfg.ask_once and h_cfg.is_session_authorized:
             return True
         
-        from orionagent.agents.hitl import is_risky_action
         if h_cfg.permission_level == "medium":
             plan_str = str(plan)
-            if not is_risky_action(plan_str):
+            # Efficient: Pass the model for LLM-based risk check
+            if not is_risky_action(plan_str, model=model if h_cfg.use_llm else None):
                 return True
 
         print(f"\n\033[1m[ORION HITL] Task Approval Required\033[0m")

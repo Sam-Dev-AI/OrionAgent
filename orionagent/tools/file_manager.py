@@ -13,16 +13,13 @@ class FileAction(Enum):
 
 @tool
 def file_manager(action: FileAction, filepath: str, content: str) -> str:
-    """An industrial-grade OS file manager for system-level file operations.
-    You have full read/write access to the local filesystem.
-    
-    CRITICAL: Always use absolute paths when possible. If you create a file, ensure
-    the parent directories exist (the tool will attempt to create them automatically).
+    """Reads, writes, deletes, or lists local files. Essential for persistent data management. 
+    Always use absolute paths when possible. Parent directories will be created automatically.
 
     Args:
         action: The operation (read, write, append, list, delete, create_dir).
         filepath: The path to the target file or directory.
-        content: The data payload for write/append operations. Leave empty for others.
+        content: The data payload for write/append. Only needed for operations that modify files.
     """
     if isinstance(action, str):
         try:

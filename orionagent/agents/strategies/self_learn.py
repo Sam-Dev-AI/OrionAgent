@@ -22,12 +22,12 @@ from orionagent.agents.strategies.base import BaseStrategy
 from orionagent.models.base_provider import ModelProvider
 
 
-# Lightweight eval prompt -- ~50 tokens of instructions
-_EVAL_PROMPT = """Rate quality 1-5. If < 3, give ONE line feedback.
+# Lightweight eval prompt -- ~25 tokens
+_EVAL_PROMPT = """Rate quality 1-5. Feedback only if < 3.
 Task: {task}
 Response: {response}
 
-Reply:
+Reply Format:
 SCORE: <#>
 FEEDBACK: <text>"""
 
@@ -125,6 +125,12 @@ class SelfLearnStrategy(BaseStrategy):
             
             response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False, priority=priority, temperature=temperature)
             
+            # Efficiency Hack: Skip evaluation for very short conversational responses
+            if len(original_task.split()) < 8 or len(response.split()) < 15:
+                self._record(original_task, selected.name, success=True)
+                parts.append(response)
+                return "".join(parts)
+
             score, feedback = self._evaluate(original_task, response, model, system_instruction, context)
 
             if score >= 3:
@@ -182,6 +188,12 @@ class SelfLearnStrategy(BaseStrategy):
             # Must collect full response for evaluation
             response = selected.ask(task, stream=False, use_strategy=False, record_memory=False, record_trace=False, priority=priority, temperature=temperature)
 
+            # Efficiency Hack: Skip evaluation for very short conversational responses
+            if len(original_task.split()) < 8 or len(response.split()) < 15:
+                self._record(original_task, selected.name, success=True)
+                yield response
+                return
+
             score, feedback = self._evaluate(original_task, response, model, system_instruction, context)
 
             if score >= 3:
@@ -223,7 +235,7 @@ class SelfLearnStrategy(BaseStrategy):
         # Truncate response to save tokens in eval
         truncated = response[:500] if len(response) > 500 else response
 
-        prompt_task = f"{context}\n\n==== PREVIOUS CONTEXT RUNNING UP TO CURRENT TASK ====\n{task}" if context else task
+        prompt_task = f"{context}\n\n==== ACTIVE TASK ====\nEvaluate the following task and response:\n\n{task}" if context else task
         prompt = _EVAL_PROMPT.format(task=prompt_task, response=truncated)
         
         si = system_instruction + "\n\nBe very brief. Respond in the exact format requested." if system_instruction else "Be very brief. Respond in the exact format requested."

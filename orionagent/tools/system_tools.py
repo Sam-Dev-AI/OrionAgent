@@ -14,18 +14,12 @@ class SysAction(Enum):
 
 @tool
 def system_tools(action: SysAction, expression: Optional[str] = None) -> str:
-    """Accesses underlying OS system information, time, and lightweight computational utilities.
-
-    When to use:
-    - 'time': For precise timestamps or synchronization.
-    - 'info': To understand the host OS, Python version, and machine architecture.
-    - 'calculate': For simple, single-line math expressions (e.g. 'math.sqrt(144) * 2').
-    
-    NOTE: For complex scripts or multi-line logic, use the 'python_sandbox' instead.
+    """Accesses system info (OS, CPU, Time). Use for environment-aware logic.
+    For complex scripts, use 'python_sandbox' instead.
 
     Args:
         action: The utility to run (time, info, or calculate).
-        expression: The strict mathematical expression string for calculate (e.g. '5 * 2').
+        expression: Mathematical expression string (e.g. '5 * 2') for calculate.
     """
     if isinstance(action, str):
         try:

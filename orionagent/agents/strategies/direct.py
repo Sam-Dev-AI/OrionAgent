@@ -10,6 +10,7 @@ from typing import Generator, List, Optional, Union, Any
 from orionagent.agents.base_agent import Agent
 from orionagent.agents.strategies.base import BaseStrategy
 from orionagent.models.base_provider import ModelProvider
+from orionagent.agents.hitl import is_risky_action
 
 
 class DirectStrategy(BaseStrategy):
@@ -35,7 +36,16 @@ class DirectStrategy(BaseStrategy):
         on_step_complete: Optional[Any] = None,
     ) -> Union[str, Generator[str, None, None], Any]:
 
-        prompt = f"{context}\n\n==== CURRENT TASK ====\n{task}" if context else task
+        if context:
+            prompt = (
+                f"{context}\n\n"
+                f"==== ACTIVE TASK ====\n"
+                f"IMPORTANT: The history provided above is for context ONLY. "
+                f"Your CURRENT GOAL is to address the following request:\n\n"
+                f"{task}"
+            )
+        else:
+            prompt = task
         
         # Inject global memory context from Manager into the agent prompt
         if manager_context:
@@ -54,7 +64,7 @@ class DirectStrategy(BaseStrategy):
                 if hitl:
                     from orionagent.agents.hitl import HitlConfig
                     h_cfg = hitl if isinstance(hitl, HitlConfig) else HitlConfig()
-                    self._approve_direct(task, "Manager (Internal)", h_cfg)
+                    self._approve_direct(task, "Manager (Internal)", h_cfg, model=model)
                 if stream:
                     return self._stream_manager(model, prompt, system_instruction, temperature, tools)
                 return model.generate(
@@ -70,7 +80,7 @@ class DirectStrategy(BaseStrategy):
         if hitl:
             from orionagent.agents.hitl import HitlConfig
             h_cfg = hitl if isinstance(hitl, HitlConfig) else HitlConfig()
-            if not self._approve_direct(task, selected.name, h_cfg):
+            if not self._approve_direct(task, selected.name, h_cfg, model=model):
                 raise InterruptedError("Delegation rejected by user via HITL.")
 
         if stream:
@@ -98,7 +108,7 @@ class DirectStrategy(BaseStrategy):
             on_step_complete(selected.name, task, result)
         return result
 
-    def _approve_direct(self, task: str, agent_name: str, h_cfg: "HitlConfig") -> bool:
+    def _approve_direct(self, task: str, agent_name: str, h_cfg: "HitlConfig", model: Optional[ModelProvider] = None) -> bool:
         """Interactive terminal approval for single delegation."""
         if h_cfg.permission_level == "high":
             return True
@@ -106,9 +116,9 @@ class DirectStrategy(BaseStrategy):
         if h_cfg.ask_once and h_cfg.is_session_authorized:
             return True
             
-        from orionagent.agents.hitl import is_risky_action
         if h_cfg.permission_level == "medium":
-            if not is_risky_action(task):
+            # Efficient: Pass the model for LLM-based risk check
+            if not is_risky_action(task, model=model if h_cfg.use_llm else None):
                 return True
 
         print(f"\n\033[1m[ORION HITL] Delegation Approval Required\033[0m")

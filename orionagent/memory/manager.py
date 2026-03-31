@@ -188,7 +188,16 @@ class MemoryPipeline:
             
         context_parts = []
         
-        # 1. Retrieve from Long-Term Memory (Persistent) - Shortened header
+        # Add a clear preamble to orient the LLM
+        preamble = (
+            "--- CONVERSATION HISTORY ---\n"
+            "The following is a retrieved history of the current conversation. "
+            "Use this ONLY as context. DO NOT respond to these historical messages directly. "
+            "The active task is always identified as 'ACTIVE TASK' at the end of this prompt.\n"
+        )
+        context_parts.append(preamble)
+        
+        # 1. Retrieve from Long-Term Memory (Persistent)
         if self.config.mode == "persistent" and self.persistent_db:
             facts = self.persistent_db.search(
                 query=current_task,
@@ -198,13 +207,13 @@ class MemoryPipeline:
                 min_importance=self.config.importance_threshold
             )
             if facts:
-                context_parts.append("[LTM]")
+                context_parts.append("[LONG_TERM_FACTS]")
                 for f in facts:
                     context_parts.append(f"- {f['content']}")
                     
         # 2. Structured Entities/Facts (High priority)
         if self.config.extract_entities and session.entities:
-            context_parts.append("\n[FACTS]")
+            context_parts.append("\n[EXTRACTED_KNOWLEDGE]")
             for name, data in session.entities.items():
                 cat = data.get("category", "General")
                 val = data.get("value", "")
@@ -212,23 +221,23 @@ class MemoryPipeline:
 
         # 3. Global Recap (Layer 4)
         if session.session_summary:
-            context_parts.append("\n[GLOBAL]")
+            context_parts.append("\n[SESSION_SUMMARY]")
             context_parts.append(session.session_summary[:self.config.max_global_summary_tokens * 4])
             
         # 4. Chunk Summaries (Layer 3)
         if session.chunk_summaries:
-            context_parts.append("\n[CHUNKS]")
+            context_parts.append("\n[HISTORICAL_CHUNKS]")
             for chunk in session.chunk_summaries[-3:]: # Only latest 3 chunks
                 context_parts.append(f"- {chunk[:self.config.max_chunk_tokens * 4]}")
                 
         # 5. Recent Detailed Summary (Layer 2)
         if session.recent_summary:
-            context_parts.append("\n[RECENT]")
+            context_parts.append("\n[LATEST_SUMMARY]")
             context_parts.append(session.recent_summary[:self.config.max_recent_summary_tokens * 4])
                 
         # 6. Working Dialogue (Layer 1 - Raw)
         if session.messages:
-            context_parts.append("\n[DIALOGUE]")
+            context_parts.append("\n[RECENT_DIALOGUE]")
             # Apply strict limit to raw dialogue with per-message truncation
             remaining_budget = self.config.max_dialogue_tokens
             
@@ -238,7 +247,7 @@ class MemoryPipeline:
                 if remaining_budget <= 0:
                     break
                     
-                role_char = "U" if msg["role"] == "user" else "A"
+                role_name = "USER" if msg["role"] == "user" else "ASSISTANT"
                 content = msg["content"]
                 content_tokens = self._estimate_tokens(content)
                 
@@ -248,10 +257,12 @@ class MemoryPipeline:
                     content = content[:char_limit] + "... [TRUNCATED]"
                     content_tokens = remaining_budget
                 
-                dialogue_turns.insert(0, f"{role_char}: {content}")
+                dialogue_turns.insert(0, f"[{role_name}]: {content}")
                 remaining_budget -= content_tokens
             
             context_parts.extend(dialogue_turns)
+        
+        context_parts.append("\n--- END OF HISTORY ---")
                 
         return "\n".join(context_parts)
 

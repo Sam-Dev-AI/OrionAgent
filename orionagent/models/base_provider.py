@@ -10,11 +10,21 @@ from orionagent.tools.base_tool import Tool
 class ModelProvider:
     """Abstract base for model providers."""
 
-    def __init__(self, token_count: bool = False, streaming: bool = True, verbose: bool = False, debug: bool = False):
+    def __init__(
+        self,
+        token_count: bool = False,
+        streaming: bool = True,
+        verbose: bool = False,
+        debug: bool = False,
+        thinking: bool = False,
+        show_thinking: bool = True,
+    ):
         self.token_count = token_count
         self.streaming = streaming
         self.verbose = verbose
         self.debug = debug
+        self.thinking = thinking
+        self.show_thinking = show_thinking
 
 
     def generate(

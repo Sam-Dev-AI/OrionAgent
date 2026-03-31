@@ -21,8 +21,17 @@ class Ollama(ModelProvider):
         streaming: bool = True,
         verbose: bool = False,
         debug: bool = False,
+        thinking: bool = False,
+        show_thinking: bool = True,
     ):
-        super().__init__(token_count=token_count, streaming=streaming, verbose=verbose, debug=debug)
+        super().__init__(
+            token_count=token_count,
+            streaming=streaming,
+            verbose=verbose,
+            debug=debug,
+            thinking=thinking,
+            show_thinking=show_thinking
+        )
         self.model_name = model_name
         self.base_url = base_url.rstrip("/")
         self.temperature = temperature
@@ -87,7 +96,15 @@ class Ollama(ModelProvider):
         data = response.json()
         
         self._print_token_usage(data)
-        return data["response"]
+        res = data["response"]
+
+        # Thinking filtering
+        if self.thinking and not self.show_thinking:
+            import re
+            # Strip <thought>...</thought> and <reasoning>...</reasoning>
+            res = re.sub(r"<(thought|reasoning)>.*?</\1>", "", res, flags=re.DOTALL).strip()
+        
+        return res
 
     def generate_stream(
         self,
@@ -119,9 +136,36 @@ class Ollama(ModelProvider):
         response = requests.post(url, json=payload, stream=True)
         response.raise_for_status()
         
+        in_thought = False
+        thought_tags = ["<thought>", "<reasoning>"]
+        end_thought_tags = ["</thought>", "</reasoning>"]
+
         for line in response.iter_lines():
             if line:
                 data = json.loads(line)
                 if data.get("done"):
                     self._print_token_usage(data)
-                yield data.get("response", "")
+                
+                chunk = data.get("response", "")
+                if not chunk:
+                    continue
+
+                if self.thinking and not self.show_thinking:
+                    # Simple stateful filter for thought tags
+                    # Note: This handles chunks containing the full tag or partial.
+                    # For highly fragmented chunks, this might need a windowed buffer,
+                    # but for most Ollama streams, tags arrive in discrete chunks.
+                    chunk_lower = chunk.lower()
+                    
+                    if any(tag in chunk_lower for tag in thought_tags):
+                        in_thought = True
+                        continue
+                    
+                    if any(tag in chunk_lower for tag in end_thought_tags):
+                        in_thought = False
+                        continue
+                    
+                    if in_thought:
+                        continue
+                
+                yield chunk

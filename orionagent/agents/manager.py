@@ -123,9 +123,14 @@ class Manager:
         from orionagent.agents.hitl import HitlConfig
         self.async_mode = async_mode
         
-        # HITL Configuration
+        # HITL Configuration (Safety Lock)
         if isinstance(hitl, bool):
-            self.hitl = HitlConfig(permission_level="low" if hitl else "high")
+            # If hitl=True, default to 'medium' (Balanced Risk Check) and plan_review=True
+            self.hitl = HitlConfig(
+                permission_level="medium" if hitl else "high",
+                use_llm=True,
+                plan_review=True
+            )
         else:
             self.hitl = hitl
 

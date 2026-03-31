@@ -63,6 +63,8 @@ When defining an `Agent`, every parameter is tunable for specific engineering ne
 | `async_mode` | `bool` | **Performance Gate.** Enables parallel tool calls (Up to 60% faster). CRITICAL for scrapers/terminal use. |
 | `debug` | `bool` | **Reasoning Visibility.** Enables real-time **Industrial Logs** (`[TOOL]`, `[PLAN]`). |
 | `verbose` | `bool` | **Audit Summary.** Enables a **Trace Summary** post-execution (Detailed timing/tokens). |
+| `thinking`| `bool` | **Reasoning Mode.** Enables Chain-of-Thought (e.g. DeepSeek R1, Gemini Thinking). |
+| `show_thinking`|`bool`| **Thought Visibility.** If `False`, strips `<thought>` blocks from the output. (Default: `True`) |
 
 ---
 
@@ -199,6 +201,12 @@ manager.ask("Market analysis", allowed_agents=["Scraper", "Analyst"])
 - **When to use**: High-risk task execution (e.g. cloud deletion, sending emails, large purchases).
 - **Behavior**: An interactive terminal gate. The Manager will display its intended plan or delegation choice and wait for user input `(y/n)` before proceeding.
 
+**Shortcut Version:**
+```python
+# Enables the 'Balanced' risk check by default
+manager = Manager(agents=[...], hitl=True)
+```
+
 **Advanced Configuration (`HitlConfig`):**
 ```python
 from orionagent import Manager, HitlConfig
@@ -206,6 +214,7 @@ from orionagent import Manager, HitlConfig
 # Configure safety levels
 safety_cfg = HitlConfig(
     permission_level="medium",  # "low" (always), "medium" (risky), "high" (never)
+    use_llm=True,               # Use LLM call for intent analysis
     ask_once=True,              # Approve once for the whole session turn
     plan_review=True            # Show full decomposition before approval
 )
@@ -216,8 +225,19 @@ manager = Manager(agents=[...], hitl=safety_cfg)
 | Level | Name | Trigger Logic |
 | :--- | :--- | :--- |
 | **`low`** | Paranoiac | **Always** asks for approval for every goal or plan. |
-| **`medium`** | Balanced | Only asks if the task contains **risky keywords** (delete, run, terminal, etc.). |
+| **`medium`** | **Default** | **LLM-Based Risk Check (Active if hitl=True).** Uses a lightweight model to classify if the task is risky (e.g. system mods) or safe (e.g. math/chat). |
 | **`high`** | Autonomous | **Never** asks. Complete trust. |
+
+---
+
+### E. LLM-Based Risk Assessment (`use_llm`)
+OrionAgent's HITL now supports **Dynamic Risk Intelligence**. Instead of matching static keywords, a lightweight LLM call (~30 tokens) analyzes the *intent* of the task to determine if it's destructive.
+
+```python
+# Enable Dynamic Risk Check
+safety_cfg = HitlConfig(permission_level="medium", use_llm=True)
+```
+*Note*: If `use_llm` is False or the model call fails, the system automatically falls back to the **Deterministic Keyword Moat** (detecting words like `delete`, `rm`, `sudo`, etc.).
 
 ---
 
@@ -302,10 +322,10 @@ agent.ask("Who approved the Q1 budget?") # Auto-retrieves from SQLite
 
 1.  **Prefer `Gemini` for speed**: Its native caching makes it the fastest for high-tool use.
 2.  **Use `strategy="planning"` for complex goals**: It provides a strict, structured roadmap for specialized agents.
-3.  **Efficiency Gate**: OrionAgent's `PlanningStrategy` automatically bypasses the planning phase for simple tasks (detected via heuristic + ultra-fast analyzer call), saving ~4s of overhead.
-4.  **Agent Constraints**: Use `allowed_agents`, `blocked_agents`, and `force_agent` in `manager.ask()` for granular control over delegation.
-4.  **Token Counting**: Always use `token_count=True` during development to identify "heavy" prompts or strategies.
-5.  **Industrial Logs**: Use `debug=True` to find exactly where an agent is getting stuck in a loop or tool call.
+3.  **Efficiency Gate (Plan-Skip)**: OrionAgent's `PlanningStrategy` automatically bypasses the planning phase for simple tasks (detected via high-speed heuristic), saving ~4s of overhead.
+4.  **Token Counting**: Always use `token_count=True` during development.
+5.  **Tool Pruning**: Keep tool `description` fields ultra-concise (15-20 words). The model doesn't need a manual; it needs a functional summary.
+6.  **Eval-Skip (Self-Learn)**: In `self_learn` mode, the system automatically skips the quality evaluation step for known-good patterns and very short conversational turns (<15 words), saving ~50 tokens per call.
 
 ---
 
@@ -320,7 +340,9 @@ llm = Gemini(
     model_name="gemini-2.0-flash", 
     temperature=0.1, 
     token_count=True, 
-    debug=True
+    debug=True,
+    thinking=True,      # Auto-switches to gemini-2.0-flash-thinking-exp
+    show_thinking=False # Hide internal reasoning from the user
 )
 
 # 2. Deep Memory Config
@@ -388,7 +410,7 @@ OrionAgent is engineered to solve the "abstraction tax" of other frameworks.
 
 ### "Clean Brain" Optimization
 - **Intelligent Pruning**: Once a session summary is created, the agent automatically trims the raw history to the last 6 messages. 
-- **Compact Headers**: Internal headers are minimized (e.g., `### LTM:`) to maximize the prompt space available for the agent's reasoning.
+- **Active Task Isolation**: Every prompt uses a `==== ACTIVE TASK ====` header. This strictly separates the conversation history (context) from the current goal (action), preventing the agent from getting lost in old dialogue.
 - **Strategy Radar (Threshold Logic)**:
     - **Bypass**: Tasks $\leq$ 25 words without complexity keywords (e.g., "Hi", "How are you?") skip strategies for instant, zero-cost routing.
     - **Trigger**: Tasks $>$ 25 words or containing keywords like `research`, `analyze`, `plan` trigger full orchestration.

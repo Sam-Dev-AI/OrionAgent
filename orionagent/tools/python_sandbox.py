@@ -4,22 +4,11 @@ from orionagent.tools.decorator import tool
 
 @tool
 def python_sandbox(code: str) -> str:
-    """A Dynamic Reasoning Engine for executing complex Python logic in a secure sandbox.
-    Use this for tasks that require algorithmic thinking, data processing, or simulation.
-
-    When to use:
-    - solving complex math (e.g., n-th prime, matrix operations).
-    - manipulating large text blocks or JSON data dynamically.
-    - writing and running temporary scripts to verify a hypothesis.
-
-    Example Code:
-    ```python
-    def is_prime(n): ...
-    print([x for x in range(2, 100) if is_prime(x)])
-    ```
+    """Executes Python code in a secure subprocess. Use for math, logic, and data transformation.
+    Always use print() to see output.
 
     Args:
-        code: The complete, valid Python 3 code snippet to execute. Use print() for output.
+        code: The complete, valid Python 3 code snippet to execute.
     """
     try:
         result = subprocess.run(

@@ -24,10 +24,25 @@ class Gemini(ModelProvider):
         streaming: bool = True,
         verbose: bool = False,
         debug: bool = False,
+        thinking: bool = False,
+        show_thinking: bool = True,
     ):
-        super().__init__(token_count=token_count, streaming=streaming, verbose=verbose, debug=debug)
+        super().__init__(
+            token_count=token_count,
+            streaming=streaming,
+            verbose=verbose,
+            debug=debug,
+            thinking=thinking,
+            show_thinking=show_thinking
+        )
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
-        self.model_name = model_name
+        
+        # Auto-switch to thinking model if requested and using default
+        if self.thinking and model_name == "gemini-2.0-flash":
+            self.model_name = "gemini-2.0-flash-thinking-exp"
+        else:
+            self.model_name = model_name
+
         self.temperature = temperature
         
         self.session_input_tokens = 0

@@ -4,14 +4,11 @@ from orionagent.tools.decorator import tool
 
 @tool
 def execute_command(command: str) -> str:
-    """Executes a shell command directly on the host system.
-    
-    INDUSTRIAL WARNING: You have direct OS access. 
-    Use this for: Environment setup, package installation, starting services, or git operations.
-    DO NOT use this for: Deleting uncontrolled files or running recursive destructive commands.
+    """Runs shell commands directly on the host. Use for environment setup, package installation, and OS management.
+    WARNING: Use with caution. Do not run destructive or recursive commands.
 
     Args:
-        command: The full shell command to execute (e.g. 'pip install requests' or 'git status').
+        command: The full shell command to execute (e.g. 'pip install requests').
     """
     try:
         result = subprocess.run(

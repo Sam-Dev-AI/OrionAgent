@@ -62,10 +62,7 @@ class Agent:
         self.role = role
         self.description = description
         
-        _META_INSTRUCTION = """RULES:
-1. Answer directly if you know the answer. Only use tools when necessary.
-2. Call multiple tools in parallel when possible.
-3. Keep responses concise and focused on the task."""
+        _META_INSTRUCTION = "RULES: 1. Answer directly if known. 2. Use tools only if needed. 3. Call tools in parallel. 4. Be concise."
         self.system_instruction = f"{_META_INSTRUCTION}\n\n{system_instruction}" if system_instruction else _META_INSTRUCTION
         self.async_mode = async_mode
         self.debug = debug
@@ -196,7 +193,13 @@ class Agent:
                 self._memory_pipeline.process_turn(session, "user", task, self.model)
             context = self._memory_pipeline.build_context(session, current_task=task)
             if context:
-                prompt = f"{context}\n\n==== CURRENT TASK ====\n{task}"
+                prompt = (
+                    f"{context}\n\n"
+                    f"==== ACTIVE TASK ====\n"
+                    f"IMPORTANT: The history provided above is for context ONLY. "
+                    f"Your CURRENT GOAL is to address the following request:\n\n"
+                    f"{task}"
+                )
 
         if use_strategy and self._strategy:
             res = self._strategy.execute(
