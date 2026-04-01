@@ -199,10 +199,12 @@ manager = Manager(
 OrionAgent uses a hybrid routing engine to balance intelligence and cost. Simple conversational tasks automatically bypass expensive orchestration.
 
 **Threshold Logic:**
-- **Mode 1: Bypass**: If task $\leq$ 25 words AND no complex keywords exist $\rightarrow$ Fast Direct Routing.
-- **Mode 2: Advanced**: If task $>$ 25 words OR contains complex keywords $\rightarrow$ Planning/Self-Learn Triggered.
+OrionAgent employs **Dynamic Intent Analysis**. Instead of static word counts, a lightweight LLM call analyzes the task's complexity to decide the optimal execution path.
 
-**Complexity Keywords**: `research`, `browser`, `analyze`, `compare`, `summary`, `outline`, `first`, `then`, `finally`, `steps`, `plan`, `extract`, `find all`.
+- **Mode 1: Bypass**: Simple tasks (greetings, one-shot questions) $\rightarrow$ Fast Direct Routing.
+- **Mode 2: Advanced**: Complex, multi-step goals $\rightarrow$ Strategic Planning Triggered.
+
+**Complexity Keywords (Reference)**: `research`, `browser`, `analyze`, `compare`, `summary`, `outline`, `first`, `then`, `finally`, `steps`, `plan`, `extract`, `find all`.
 
 ### 4. High-Performance Execution Engine
 OrionAgent is engineered for zero-latency. Control core performance variables directly:
