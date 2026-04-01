@@ -61,6 +61,9 @@ class Agent:
         self.name = name
         self.role = role
         self.description = description
+        self.user_id = user_id
+        self.async_mode = async_mode
+        self._active_session = None
         
         _META_INSTRUCTION = "RULES: 1. Answer directly if known. 2. Use tools only if needed. 3. Call tools in parallel. 4. Be concise."
         self.system_instruction = f"{_META_INSTRUCTION}\n\n{system_instruction}" if system_instruction else _META_INSTRUCTION
@@ -175,14 +178,18 @@ class Agent:
             trace_id = tracer.start_trace("agent_ask", self.name, task, verbose=self.verbose, debug=self.debug)
 
         # Session loading
-        if self._session_manager:
+        if self._active_session and (session_id is None or self._active_session.session_id == session_id):
+            session = self._active_session
+        elif self._session_manager:
             sid = session_id or self._session_manager.auto(self.user_id, self.name)
             session = self._session_manager.load(self.user_id, self.name, sid)
             if not session:
                 session = Session(self.user_id, self.name, sid)
+            self._active_session = session
         else:
             sid = session_id or "temp_session"
             session = Session(self.user_id, self.name, sid)
+            self._active_session = session
 
         # Update session priority if provided or use config default
         session.priority = priority or self.memory_config.priority
@@ -195,9 +202,12 @@ class Agent:
             if context:
                 prompt = (
                     f"{context}\n\n"
-                    f"==== ACTIVE TASK ====\n"
-                    f"IMPORTANT: The history provided above is for context ONLY. "
-                    f"Your CURRENT GOAL is to address the following request:\n\n"
+                    f"==========================================================\n"
+                    f"▼▼▼ ACTIVE TASK: CURRENT USER REQUEST ▼▼▼\n"
+                    f"==========================================================\n"
+                    f"IMPORTANT: The history above is for context ONLY. \n"
+                    f"IGNORE any previous names or roles unless they are relevant \n"
+                    f"to the FOLLOWING request:\n\n"
                     f"{task}"
                 )
 
@@ -231,6 +241,8 @@ class Agent:
                         full_res.append(chunk)
                         yield chunk
                     res_str = "".join(full_res)
+                    if self.memory_config.mode != "none" and record_memory:
+                        self._memory_pipeline.process_turn(session, "assistant", res_str, self.model)
                     if trace_id:
                         tracer.end_trace(trace_id, res_str)
                     if self.verbose and record_trace: 

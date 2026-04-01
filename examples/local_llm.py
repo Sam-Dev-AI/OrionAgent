@@ -8,8 +8,9 @@ llm = OpenAI(
     base_url="http://127.0.0.1:1234/v1",  # LM Studio uses /v1 for OpenAI compatibility
     api_key="lm-studio",                # Placeholder key for local usage
     temperature=0.7,
-    token_count=True,
-    debug=True
+    token_count=True,     # Enable reasoning support (e.g. for DeepSeek-R1) # Set to False to hide <think> tags from the user
+    debug=False
+    
 )
 
 # 2. Simple Single Agent Setup

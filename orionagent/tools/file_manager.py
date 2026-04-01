@@ -12,7 +12,7 @@ class FileAction(Enum):
     CREATE_DIR = "create_dir"
 
 @tool
-def file_manager(action: FileAction, filepath: str, content: str) -> str:
+def file_manager(action: FileAction, filepath: str, content: Optional[str] = None) -> str:
     """Reads, writes, deletes, or lists local files. Essential for persistent data management. 
     Always use absolute paths when possible. Parent directories will be created automatically.
 

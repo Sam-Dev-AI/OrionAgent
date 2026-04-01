@@ -25,9 +25,8 @@ class MemoryPipeline:
         tracer.log_event("memory", f"Storing {role} turn", display_content, verbose=is_verbose, debug=is_debug)
 
         session.messages.append({"role": role, "content": content})
-        # Batch saves: only save to disk every 3 messages or if it's the first message
-        if len(session.messages) % 3 == 0 or len(session.messages) == 1:
-            self.session_manager.save(session)
+        # Instant save for interactive consistency
+        self.session_manager.save(session)
         
         # Layered Summarization Logic
         # 1. Maintain a very small Dialogue Layer (e.g. 6 messages)

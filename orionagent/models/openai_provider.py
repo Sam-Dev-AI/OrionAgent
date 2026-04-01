@@ -21,8 +21,17 @@ class OpenAI(ModelProvider):
         verbose: bool = False,
         debug: bool = False,
         base_url: Optional[str] = None,
+        thinking: bool = False,
+        show_thinking: bool = True,
     ):
-        super().__init__(token_count=token_count, streaming=streaming, verbose=verbose, debug=debug)
+        super().__init__(
+            token_count=token_count,
+            streaming=streaming,
+            verbose=verbose,
+            debug=debug,
+            thinking=thinking,
+            show_thinking=show_thinking
+        )
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self.model_name = model_name
         self.temperature = temperature
@@ -117,8 +126,14 @@ class OpenAI(ModelProvider):
                 for t in tools
             ]
 
+        # Handle o1/o3 temperature constraint
+        is_reasoning_model = self.model_name.startswith("o1") or self.model_name.startswith("o3")
         temp = temperature if temperature is not None else self.temperature
         
+        # o1 models do not support temperature
+        if is_reasoning_model:
+            temp = None
+
         kwargs = {
             "model": self.model_name,
             "messages": messages,
@@ -140,9 +155,16 @@ class OpenAI(ModelProvider):
             return ""
 
         message = response.choices[0].message
+        res = message.content or ""
+
+        # Thinking filtering
+        if self.thinking and not self.show_thinking:
+            import re
+            # Strip <thought>...</thought> and <reasoning>...</reasoning>
+            res = re.sub(r"<(thought|reasoning)>.*?</\1>", "", res, flags=re.DOTALL).strip()
         
         # INTERCEPT ROGUE TOOLS (Nemotron XML)
-        rogue_calls = self._parse_rogue_tool_calls(message.content or "")
+        rogue_calls = self._parse_rogue_tool_calls(res)
         
         if message.tool_calls or rogue_calls:
             from orionagent.tools.tool_executor import ToolExecutor
@@ -218,7 +240,13 @@ class OpenAI(ModelProvider):
                 for t in tools
             ]
 
+        # Handle o1/o3 temperature constraint
+        is_reasoning_model = self.model_name.startswith("o1") or self.model_name.startswith("o3")
         temp = temperature if temperature is not None else self.temperature
+        
+        # o1 models do not support temperature
+        if is_reasoning_model:
+            temp = None
 
         kwargs = {
             "model": self.model_name,
@@ -237,6 +265,10 @@ class OpenAI(ModelProvider):
 
         full_tool_calls = {} # tool_call_id -> {name, args, type}
         full_content = []
+        
+        in_thought = False
+        thought_tags = ["<thought>", "<reasoning>"]
+        end_thought_tags = ["</thought>", "</reasoning>"]
         
         for chunk in stream:
             # Capture usage if present (usually in the last chunk with stream_options)
@@ -260,8 +292,25 @@ class OpenAI(ModelProvider):
                         full_tool_calls[tc.index]["args"] += (tc.function.arguments or "")
             
             if delta.content:
-                full_content.append(delta.content)
-                yield delta.content
+                content = delta.content
+                full_content.append(content)
+                
+                # Thinking filtering
+                if self.thinking and not self.show_thinking:
+                    content_lower = content.lower()
+                    
+                    if any(tag in content_lower for tag in thought_tags):
+                        in_thought = True
+                        continue
+                    
+                    if any(tag in content_lower for tag in end_thought_tags):
+                        in_thought = False
+                        continue
+                    
+                    if in_thought:
+                        continue
+                
+                yield content
 
         # INTERCEPT ROGUE TOOLS in accumulated history? 
         # Actually in stream we yield chunks immediately. 
