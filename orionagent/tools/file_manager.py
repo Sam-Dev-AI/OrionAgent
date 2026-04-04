@@ -1,4 +1,5 @@
 import os
+import shutil
 from enum import Enum
 from typing import Optional
 from orionagent.tools.decorator import tool
@@ -33,7 +34,6 @@ def file_manager(action: FileAction, filepath: str, content: Optional[str] = Non
                 return f.read()
                 
         elif action == FileAction.WRITE:
-            print(f"DEBUG: File Manager WRITE called for {filepath}")
             if content is None: content = "" # Handle null from LLMs
             os.makedirs(os.path.dirname(os.path.abspath(filepath)) or ".", exist_ok=True)
             with open(filepath, "w", encoding="utf-8") as f:
@@ -53,7 +53,7 @@ def file_manager(action: FileAction, filepath: str, content: Optional[str] = Non
             
         elif action == FileAction.DELETE:
             if os.path.isdir(filepath):
-                os.rmdir(filepath)
+                shutil.rmtree(filepath)
             else:
                 os.remove(filepath)
             return f"Successfully deleted {filepath}"

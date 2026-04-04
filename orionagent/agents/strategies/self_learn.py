@@ -62,8 +62,6 @@ class SelfLearnStrategy(BaseStrategy):
         tools: Optional[List[Any]] = None,
         stream: bool = True,
         async_mode: bool = True,
-        verbose: bool = False,
-        debug: bool = False,
         record_trace: bool = True,
         hitl: Any = False,
         priority: Optional[str] = None,
@@ -74,12 +72,12 @@ class SelfLearnStrategy(BaseStrategy):
         # Fast bypass for simple conversational tasks
         if not self.is_complex_task(task):
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
         if not model:
             # No model for eval -- fall back to single delegation
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
         # Check if we have a learned best agent for this task type
         learned_agent = self._get_learned_agent(task, agents)

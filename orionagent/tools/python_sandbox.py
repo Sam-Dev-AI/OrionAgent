@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from orionagent.tools.decorator import tool
 
 
@@ -12,7 +13,7 @@ def python_sandbox(code: str) -> str:
     """
     try:
         result = subprocess.run(
-            ["python", "-c", code],
+            [sys.executable, "-c", code],
             capture_output=True,
             text=True,
             timeout=10

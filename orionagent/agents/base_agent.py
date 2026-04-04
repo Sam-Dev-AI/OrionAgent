@@ -53,9 +53,7 @@ class Agent:
         user_id: str = "default_user",
         strategy: Optional[Union[str, List[str]]] = None,
         max_refinements: int = 2,
-        verbose: Optional[bool] = None,
         async_mode: bool = True,
-        debug: Optional[bool] = None,
         knowledge: Optional[Union[str, KnowledgeBase]] = None,
     ):
         self.name = name
@@ -68,19 +66,14 @@ class Agent:
         _META_INSTRUCTION = "RULES: 1. Answer directly if known. 2. Use tools only if needed. 3. Call tools in parallel. 4. Be concise."
         self.system_instruction = f"{_META_INSTRUCTION}\n\n{system_instruction}" if system_instruction else _META_INSTRUCTION
         self.async_mode = async_mode
-        self.debug = debug
         
         if isinstance(model, str):
             from orionagent.models.model import Model
-            self.model = Model(provider=model, debug=self.debug)
+            self.model = Model(provider=model)
         else:
             self.model = model
             
         self.user_id = user_id
-        # Inherit verbose and debug from model if not explicitly set
-        # Hierarchy: Explicit arg > Model-level > System Default (False)
-        self.verbose = verbose if verbose is not None else (getattr(self.model, "verbose", False) if self.model else False)
-        self.debug = debug if debug is not None else (getattr(self.model, "debug", False) if self.model else False)
 
         # --- Memory setup ---
         if isinstance(memory, MemoryConfig):
@@ -175,7 +168,7 @@ class Agent:
         from orionagent.tracing import tracer
         trace_id = None
         if record_trace:
-            trace_id = tracer.start_trace("agent_ask", self.name, task, verbose=self.verbose, debug=self.debug)
+            trace_id = tracer.start_trace("agent_ask", self.name, task, verbose=self.model.verbose, debug=self.model.debug)
 
         # Session loading
         if self._active_session and (session_id is None or self._active_session.session_id == session_id):
@@ -221,8 +214,6 @@ class Agent:
                 tools=self.tools,
                 stream=stream,
                 async_mode=self.async_mode,
-                verbose=self.verbose,
-                debug=self.debug,
                 record_trace=False, # Strategy internally calls agents, so we don't want deep traces
                 priority=priority
             )
@@ -245,7 +236,7 @@ class Agent:
                         self._memory_pipeline.process_turn(session, "assistant", res_str, self.model)
                     if trace_id:
                         tracer.end_trace(trace_id, res_str)
-                    if self.verbose and record_trace: 
+                    if self.model.verbose and record_trace: 
                         tracer.print_summary()
                 return _trace_generator_strategy()
             
@@ -263,7 +254,7 @@ class Agent:
                     self._memory_pipeline.process_turn(session, "assistant", res_str, self.model)
                 if trace_id:
                     tracer.end_trace(trace_id, res_str)
-                if self.verbose and record_trace:
+                if self.model.verbose and record_trace:
                     tracer.print_summary()
             return _trace_generator()
 
@@ -273,7 +264,7 @@ class Agent:
         if trace_id:
             tracer.end_trace(trace_id, res)
         
-        if self.verbose and record_trace:
+        if self.model.verbose and record_trace:
             tracer.print_summary()
             
         return res
@@ -290,7 +281,7 @@ class Agent:
     def use_tool(self, tool_name: str, input_data) -> str:
         """Run a tool via the centralised ToolExecutor."""
         from orionagent.tracing import tracer
-        trace_id = tracer.start_trace("tool_call_agent", tool_name, input_data, verbose=self.verbose, debug=self.debug)
+        trace_id = tracer.start_trace("tool_call_agent", tool_name, input_data, verbose=self.model.verbose, debug=self.model.debug)
         res = self.tool_executor.execute(tool_name, input_data, self.tools)
         tracer.end_trace(trace_id, res)
         return res

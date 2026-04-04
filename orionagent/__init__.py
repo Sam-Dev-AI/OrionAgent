@@ -25,7 +25,7 @@ Usage -- multi-agent via Manager:
         print(chunk, end="", flush=True)
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.4"
 
 from orionagent.agents.base_agent import Agent
 from orionagent.agents.manager import Manager

@@ -21,6 +21,10 @@ class MemoryPipeline:
         is_verbose = getattr(llm, "verbose", False)
         is_debug = getattr(llm, "debug", False)
         
+        # Ensure newline before assistant debug log if streaming just finished
+        if is_debug and role == "assistant":
+            print()
+
         display_content = content[:50] if content else ""
         tracer.log_event("memory", f"Storing {role} turn", display_content, verbose=is_verbose, debug=is_debug)
 

@@ -75,12 +75,11 @@ def crypto_ticker(symbol: str):
 agent = Agent(
     name="Vanguard",
     role="Research Analyst",
-    model=Gemini("gemini-2.0-flash"),
+    model=Gemini("gemini-2.5-flash", verbose=True),
     memory="long_term",          # Automatic SQLite Knowledge Storage
     use_default_tools=True,      # Integrated Web, File, and OS tools
     tools=[crypto_ticker],
     temperature=0.7,             # Model Creativity Control
-    verbose=True                 # Premium Dimmed Trace Logs
 )
 
 agent.chat("Analyze the current BTC trend.")
@@ -92,8 +91,8 @@ The `Manager` coordinates specialized agents through recursive strategy loops.
 ```python
 from orionagent import Agent, Manager, Gemini
 
-# 1. Define Model
-llm = Gemini("gemini-2.0-flash")
+# 1. Define Model (Configure logging here)
+llm = Gemini("gemini-2.5-flash", debug=True, verbose=True)
 
 # 2. Define Specialized Agents
 researcher = Agent(
@@ -114,7 +113,6 @@ manager = Manager(
     model=llm,
     agents=[researcher, writer],
     strategy="planning",           # Enable Structured Behavior Lock
-    verbose=True
 )
 
 # OrionAgent automatically detects task complexity.
@@ -212,15 +210,14 @@ OrionAgent is engineered for zero-latency. Control core performance variables di
 - **`python_sandbox` (New)**: An industrial-grade **Dynamic Reasoning Engine**. It executes complex Python logic in RAM ("Ghost Scripts") to verify math, process data, or run simulations without creating temporary files.
 
 ```python
-# 1. Enable token usage tracking and set default temperature
-llm = Gemini(model_name="gemini-2.0-flash", token_count=True, temperature=0.7)
+# 1. Enable token usage tracking and set logging (Industrial Logs)
+llm = Gemini(model_name="gemini-2.5-flash", token_count=True, temperature=0.7, debug=True)
 
 # 2. Control execution speed and streaming
 agent = Agent(
     model=llm,
     async_mode=True, # Enable parallel tool calls & strategy steps
-    temperature=0.3, # Override model default for this specific agent
-    debug=True       # Real-time 'Industrial' reasoning logs
+    temperature=0.3  # Override model default for this specific agent
 )
 
 # 3. Request-level override
@@ -229,7 +226,7 @@ agent.ask("What is the speed of light?", temperature=0.0)
 
 - **`token_count=True`**: Tracks input/output tokens for precise cost monitoring.
 - **`async_mode=True`**: Executes independent tasks in parallel (up to 60% faster).
-- **`debug=True`**: Enables live `[PLAN]`, `[TOOL]` tags in terminal.
+- **`debug=True`**: Enables live `[PLAN]`, `[TOOL]` tags in terminal (Set on the model provider).
 
 ---
 
@@ -237,16 +234,16 @@ agent.ask("What is the speed of light?", temperature=0.0)
 
 ### Professional Logging & Observability
 OrionAgent offers two tiers of visibility:
-1.  **`debug=True`**: Real-time "Industrial" logs (tags like `[TOOL]`, `[PLAN]`). Use this to watch agents think and work live.
-2.  **`verbose=True`**: Post-execution "Trace Summary". Use this for clean, professional reports of what happened and how long it took.
+1.  **Industrial Logs** (`debug=True`): Real-time analysis (tags like `[TOOL]`, `[PLAN]`). Use this to watch agents think and work live.
+2.  **Trace Summary** (`verbose=True`): Post-execution breakdown. Use this for clean, professional reports of timing and token usage.
 
 ```python
-# Enable 'Industrial' real-time logs + 'Trace' summary
-llm = Gemini(model_name="gemini-2.0-flash", debug=True, verbose=True)
+# NEW Pattern: Enable logging on the LLM provider
+llm = Gemini(model_name="gemini-2.5-flash", debug=True, verbose=True)
 
-# Or enable per-component for granular control
-manager = Manager(model=llm, debug=True)
-agent = Agent(name="Sentry", debug=True)
+# Manager and Agents automatically use the provider's logic
+manager = Manager(model=llm, agents=[...])
+agent = Agent(name="Sentry", model=llm)
 ```
 
 ### Concurrent Orchestration

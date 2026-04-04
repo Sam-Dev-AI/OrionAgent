@@ -7,7 +7,7 @@ from datetime import datetime
 from orionagent import Agent, Gemini, tool
 
 # 1. API KEY CONFIGURATION
-os.environ["GEMINI_API_KEY"] = "Your_API_Key"
+os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "Your_API_Key")
 
 # 2. DEFINE INDUSTRIAL CUSTOM TOOLS
 @tool
@@ -108,8 +108,6 @@ def main():
         memory="long_term",
         use_default_tools=True,
         tools=[scrape_website, save_leads_to_csv],
-        verbose=True,
-        debug=True,
     )
 
     print("\n" + "="*60)

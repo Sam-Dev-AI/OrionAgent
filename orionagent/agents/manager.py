@@ -62,9 +62,7 @@ class Manager:
         max_refinements: int = 2,
         temperature: Optional[float] = None,
         knowledge: Optional[str] = None,
-        verbose: bool = False,
         async_mode: bool = True,
-        debug: bool = False,
         hitl: Union[bool, "HitlConfig"] = False,
     ):
         self.name = name
@@ -117,9 +115,6 @@ class Manager:
         )
         self.user_id = user_id
         self.temperature = temperature
-        # Inherit verbose and debug from model if not explicitly set
-        self.verbose = verbose or (getattr(self._model, "verbose", False) if self._model else False)
-        self.debug = debug or (getattr(self._model, "debug", False) if self._model else False)
         from orionagent.agents.hitl import HitlConfig
         self.async_mode = async_mode
         
@@ -211,11 +206,6 @@ class Manager:
         if self._model and agent.model is None:
             agent.model = self._model
         
-        if self.verbose:
-            agent.verbose = True
-        if self.debug:
-            agent.debug = True
-            
         self._agents.append(agent)
         return self
 
@@ -242,7 +232,7 @@ class Manager:
         
         trace_id = None
         if record_trace:
-            trace_id = tracer.start_trace("manager_ask", self.name, task, verbose=self.verbose, debug=self.debug)
+            trace_id = tracer.start_trace("manager_ask", self.name, task, verbose=self._model.verbose, debug=self._model.debug)
 
         if not self._agents and not self.tools:
             error = "Error: No agents or tools added to the manager."
@@ -263,8 +253,6 @@ class Manager:
                 use_default_tools=False,
                 system_instruction=self.system_instruction,
                 memory="session",
-                verbose=self.verbose,
-                debug=self.debug
             )
             execution_agents = [manager_proxy]
 
@@ -326,7 +314,7 @@ class Manager:
             result_summary = result[:2000] if len(result) > 2000 else result
             memory_entry = f"[Agent: {agent_name}] Task: {step_task[:200]}\nResult: {result_summary}"
             self._memory_pipeline.process_turn(session, "assistant", memory_entry, self._model)
-            if self.debug:
+            if self._model.debug:
                 print(f"\n[GLOBAL MEMORY] Recorded result from {agent_name} ({len(result)} chars)")
 
         result = self._strategy.execute(
@@ -339,8 +327,6 @@ class Manager:
             tools=self.tools,
             stream=stream,
             async_mode=self.async_mode,
-            verbose=self.verbose,
-            debug=self.debug,
             record_trace=False,
             hitl=self.hitl,
             priority=priority,
@@ -375,7 +361,7 @@ class Manager:
                     self._memory_pipeline.process_turn(session, "assistant", res_str, self._model)
                 if trace_id:
                     tracer.end_trace(trace_id, res_str)
-                if self.verbose and record_trace:
+                if self._model.verbose and record_trace:
                     tracer.print_summary()
             return _stream_and_log()
         else:
@@ -383,7 +369,7 @@ class Manager:
                 self._memory_pipeline.process_turn(session, "assistant", result, self._model)
             if trace_id:
                 tracer.end_trace(trace_id, result)
-            if self.verbose and record_trace:
+            if self._model.verbose and record_trace:
                 tracer.print_summary()
             return result
     # ------------------------------------------------------------------

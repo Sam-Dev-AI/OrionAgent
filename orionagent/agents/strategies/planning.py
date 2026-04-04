@@ -60,8 +60,6 @@ class PlanningStrategy(BaseStrategy):
         tools: Optional[List[Any]] = None,
         stream: bool = True,
         async_mode: bool = True,
-        verbose: bool = False,
-        debug: bool = False,
         record_trace: bool = True,
         hitl: bool = False,
         priority: Optional[str] = None,
@@ -74,17 +72,21 @@ class PlanningStrategy(BaseStrategy):
         if not model:
             # No model to plan with -- fall back to single delegation
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
         # Efficiency Gate: Check if planning is actually needed
-        if not self._requires_planning(task, agents, model, system_instruction, context, temperature, verbose, debug):
-            if verbose: print("\n[PLANNER] Skipping planning stage for simple task.")
+        if not self._requires_planning(task, agents, model, system_instruction, context, temperature):
+            if model.verbose: print("\n[PLANNER] Skipping planning stage for simple task.")
+            
+            # RELAX INSTRUCTION: Remove strict JSON/No-Conversation rules for simple turns
+            relaxed_instruction = self._relax_instruction(system_instruction)
+            
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+            return DirectStrategy().execute(task, agents, model, relaxed_instruction, context, temperature, tools, stream, async_mode, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
         from orionagent.tracing import tracer
-        trace_id = tracer.start_trace("plan", "Creating task plan", task, verbose=verbose, debug=debug)
-        plan = self._create_plan(task, agents, model, system_instruction, context, temperature, verbose=verbose, debug=debug)
+        trace_id = tracer.start_trace("plan", "Creating task plan", task, verbose=model.verbose, debug=model.debug)
+        plan = self._create_plan(task, agents, model, system_instruction, context, temperature, tools=tools)
         tracer.end_trace(trace_id, f"Plan created: {len(plan)} steps")
 
         # HITL Approval Gate
@@ -96,8 +98,8 @@ class PlanningStrategy(BaseStrategy):
 
 
         if stream:
-            return self._stream_plan(plan, agents, task, model, async_mode, priority=priority, temperature=temperature, manager_context=manager_context, on_step_complete=on_step_complete, verbose=verbose)
-        return self._execute_plan_full(plan, agents, task, model, async_mode, priority=priority, temperature=temperature, manager_context=manager_context, on_step_complete=on_step_complete, verbose=verbose)
+            return self._stream_plan(plan, agents, task, model, async_mode, priority=priority, temperature=temperature, tools=tools, manager_context=manager_context, on_step_complete=on_step_complete, verbose=model.verbose)
+        return self._execute_plan_full(plan, agents, task, model, async_mode, priority=priority, temperature=temperature, tools=tools, manager_context=manager_context, on_step_complete=on_step_complete, verbose=model.verbose)
 
     # ------------------------------------------------------------------
     # Plan creation
@@ -111,15 +113,21 @@ class PlanningStrategy(BaseStrategy):
         system_instruction: Optional[str] = None,
         context: Optional[str] = None,
         temperature: Optional[float] = None,
-        verbose: bool = False,
-        debug: bool = False,
+        tools: Optional[List[Any]] = None,
     ) -> list:
         """Ask the LLM to produce a compact JSON plan."""
         from orionagent.tracing import tracer
-        tracer.log_event("plan", "Decomposing task into steps", task[:50], verbose=verbose, debug=debug)
-        roster = "\n".join(
-            f"- {a.name} ({a.role}): {a.description}. Tools: {[t.name for t in a.tools]}" for a in agents
-        )
+        roster_parts = []
+        for a in agents:
+            tools_list = [t.name for t in a.tools] if hasattr(a, 'tools') else []
+            roster_parts.append(f"- Agent {a.name} ({a.role}): {a.description}. Tools: {tools_list}")
+        
+        # Include Manager-level tools in the roster
+        if tools:
+            for t in tools:
+                roster_parts.append(f"- Manager Tool {t.name}: {t.description}")
+                
+        roster = "\n".join(roster_parts)
         
         if context:
             prompt_task = (
@@ -141,7 +149,7 @@ class PlanningStrategy(BaseStrategy):
             temperature=temperature if temperature is not None else 0.0,
         )
         
-        if debug:
+        if model.debug:
             print(f"\n[ORCHESTRATOR RAW]: {raw}")
  
         # Parse -- strip markdown fences if the model wraps them
@@ -160,7 +168,7 @@ class PlanningStrategy(BaseStrategy):
             else:
                 plan = [{"task": task, "agent": None}]
         except json.JSONDecodeError as e:
-            if verbose: print(f"[PLANNER ERROR] Failed to parse JSON: {e}")
+            if model.verbose: print(f"[PLANNER ERROR] Failed to parse JSON: {e}")
             return [{"task": task, "agent": None}]
 
         if not isinstance(plan, list) or not plan:
@@ -176,27 +184,51 @@ class PlanningStrategy(BaseStrategy):
         system_instruction: Optional[str] = None,
         context: Optional[str] = None,
         temperature: Optional[float] = None,
-        verbose: bool = False,
-        debug: bool = False,
     ) -> bool:
         """Quickly check if the task needs decomposition or can be handled as a single step."""
         # Fast local checking instead of token-heavy LLM call
         return self.is_complex_task(task)
 
+    def _relax_instruction(self, instruction: Optional[str]) -> Optional[str]:
+        """Strip planning-specific strictness for simple/conversational tasks."""
+        if not instruction:
+            return instruction
+        
+        # 1. Remove JSON output format section
+        if "[OUTPUT FORMAT - STRICT JSON]" in instruction:
+            instruction = instruction.split("[OUTPUT FORMAT - STRICT JSON]")[0]
+            
+        # 2. Relax strict 'no-answer' rules
+        instruction = instruction.replace("* DO NOT generate code, search the web, or produce final user answers.", "")
+        instruction = instruction.replace("* Do NOT include conversational text.", "")
+        instruction = instruction.replace("* ONLY delegate and coordinate.", "* Coordinate agents and handle general context.")
+        
+        # 3. Add conversational capability
+        instruction += (
+            "\n\n[CONVERSATION RULE]\n"
+            "* If the task is a greeting, identity question, or doesn't require agent delegation, "
+            "respond directly as the Manager."
+        )
+        return instruction.strip()
+
     # ------------------------------------------------------------------
     # Plan execution
     # ------------------------------------------------------------------
 
-    def _find_agent(self, name: Optional[str], agents: List[Agent]) -> Agent:
-        """Find agent by name, fall back to first agent."""
+    def _find_agent_or_tool(self, name: Optional[str], agents: List[Agent], manager_tools: Optional[List[Any]] = None) -> Union[Agent, Any]:
+        """Find agent by name or return a tool if the name matches."""
         if name:
             for a in agents:
                 if a.name.lower() == name.lower():
                     return a
+            if manager_tools:
+                for t in manager_tools:
+                    if t.name.lower() == name.lower():
+                        return t
         return agents[0]
 
     def _execute_plan_full(
-        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, manager_context: Optional[str] = None, on_step_complete: Optional[Any] = None, verbose: bool = False
+        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, tools: Optional[List[Any]] = None, manager_context: Optional[str] = None, on_step_complete: Optional[Any] = None, verbose: bool = False
     ) -> str:
         """Execute all plan steps and return a synthesized final result."""
         results = []
@@ -209,8 +241,9 @@ class PlanningStrategy(BaseStrategy):
             
             # Robustness for either old or new step keys
             instruction = step.get("task", step.get("s", step.get("step", original_task)))
-            agent_name = step.get("agent", step.get("a", "Unknown"))
-            agent = self._find_agent(agent_name, agents)
+            target_name = step.get("agent", step.get("a", "Unknown"))
+            # Pass agents and tools (from signature) to the lookup
+            target = self._find_agent_or_tool(target_name, agents, tools)
             
             # Build prompt with global context + step context
             prompt_parts = []
@@ -221,26 +254,37 @@ class PlanningStrategy(BaseStrategy):
             prompt_parts.append(f"### TASK ###\n{instruction}")
             prompt = "\n\n".join(prompt_parts)
             
-            last_result = agent.ask(
-                task=prompt,
-                stream=False,
-                use_strategy=False,
-                record_memory=False,
-                record_trace=True,
-                priority=priority,
-                temperature=temperature
-            )
+            # Case 1: Target is an Agent
+            if isinstance(target, Agent):
+                last_result = target.ask(
+                    task=prompt,
+                    stream=False,
+                    use_strategy=False,
+                    record_memory=False,
+                    record_trace=True,
+                    priority=priority,
+                    temperature=temperature
+                )
+            # Case 2: Target is a Manager Tool
+            else:
+                # Tools might expect specific args, but for simple planning we pass prompt as 'task' if it accepts it
+                import inspect
+                sig = inspect.signature(target.run)
+                if 'task' in sig.parameters or any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values()):
+                    last_result = target.run(input_data={'task': prompt})
+                else:
+                    last_result = target.run(input_data={})
             # Record step result into Manager's global memory
             if on_step_complete:
-                on_step_complete(agent_name, instruction, last_result)
+                on_step_complete(target_name, instruction, last_result)
             
-            results.append({"agent": agent_name, "task": instruction, "output": last_result})
+            results.append({"agent": target_name, "task": instruction, "output": last_result})
 
         # Final Aggregation / Synthesis Layer
         return self._synthesize_results(original_task, results, model, verbose=verbose)
 
     def _stream_plan(
-        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, manager_context: Optional[str] = None, on_step_complete: Optional[Any] = None, verbose: bool = False
+        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, tools: Optional[List[Any]] = None, manager_context: Optional[str] = None, on_step_complete: Optional[Any] = None, verbose: bool = False
     ) -> Generator[str, None, None]:
         """Stream plan execution, yielding debug info and the final synthesized result."""
         results = []
@@ -250,12 +294,13 @@ class PlanningStrategy(BaseStrategy):
                 last_result = last_result[:5000] + "\n... [context truncated] ...\n" + last_result[-5000:]
                 
             instruction = step.get("task", step.get("s", step.get("step", original_task)))
-            agent_name = step.get("agent", step.get("a", "Unknown"))
-            agent = self._find_agent(agent_name, agents)
+            target_name = step.get("agent", step.get("a", "Unknown"))
+            # Pass agents and tools (from signature) to the lookup
+            target = self._find_agent_or_tool(target_name, agents, tools)
             
             # Only show visual headers if verbose is enabled
             if verbose:
-                yield f"\n\033[1m[STEP {i}] {agent_name}: {instruction}\033[0m\n"
+                yield f"\n\033[1m[STEP {i}] {target_name}: {instruction}\033[0m\n"
             
             # Build prompt with global context + step context
             prompt_parts = []
@@ -267,27 +312,36 @@ class PlanningStrategy(BaseStrategy):
             prompt = "\n\n".join(prompt_parts)
             
             step_res = ""
-            for chunk in agent.ask(
-                task=prompt, 
-                stream=True, 
-                use_strategy=False, 
-                record_memory=False, 
-                record_trace=True, 
-                priority=priority, 
-                temperature=temperature
-            ):
-                step_res += chunk
-                # Still yield agent chunks to keep the stream alive, but user wanted "clean"
-                # We can wrap them in a debug marker or just yield them if verbose
+            if isinstance(target, Agent):
+                for chunk in target.ask(
+                    task=prompt, 
+                    stream=True, 
+                    use_strategy=False, 
+                    record_memory=False, 
+                    record_trace=True, 
+                    priority=priority, 
+                    temperature=temperature
+                ):
+                    step_res += chunk
+                    if verbose:
+                        yield chunk
+            else:
+                # Tool execution (Tools are synchronous for now)
+                import inspect
+                sig = inspect.signature(target.run)
+                if 'task' in sig.parameters or any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values()):
+                    step_res = target.run(input_data={'task': prompt})
+                else:
+                    step_res = target.run(input_data={})
                 if verbose:
-                    yield chunk
+                    yield step_res
             
             last_result = step_res
             # Record step result into Manager's global memory
             if on_step_complete:
-                on_step_complete(agent_name, instruction, step_res)
+                on_step_complete(target_name, instruction, step_res)
             
-            results.append({"agent": agent_name, "task": instruction, "output": step_res})
+            results.append({"agent": target_name, "task": instruction, "output": step_res})
             if verbose:
                 yield "\n"
 

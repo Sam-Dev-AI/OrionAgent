@@ -45,12 +45,25 @@ def system_tools(action: SysAction, expression: Optional[str] = None) -> str:
             if not expression:
                 return "Error: mathematical expression is required for calculation."
 
-            allowed_names = {"__builtins__": None}
+            # Whitelist of safe built-ins for calculation
+            allowed_names = {
+                "__builtins__": None,
+                "abs": abs,
+                "round": round,
+                "min": min,
+                "max": max,
+                "pow": pow,
+                "sum": sum,
+                "len": len,
+                "int": int,
+                "float": float
+            }
+            
             code = compile(expression, "<string>", "eval")
             for name in code.co_names:
                 if name not in allowed_names:
-                    raise NameError(f"Use of {name} not allowed")
-            result = eval(code, {"__builtins__": None}, {})
+                    raise NameError(f"Use of '{name}' is not allowed for security reasons.")
+            result = eval(code, {"__builtins__": None}, allowed_names)
             return str(result)
 
     except Exception as e:

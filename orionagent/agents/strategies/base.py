@@ -33,8 +33,6 @@ class BaseStrategy:
         tools: Optional[List[Any]] = None,
         stream: bool = True,
         async_mode: bool = True,
-        verbose: bool = False,
-        debug: bool = False,
         record_trace: bool = True,
         hitl: Any = False,
         priority: Optional[str] = None,

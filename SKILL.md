@@ -61,10 +61,9 @@ When defining an `Agent`, every parameter is tunable for specific engineering ne
 | `use_default_tools` | `bool` | Auto-loads Browser, File, OS, Terminal, and Python tools. |
 | `memory` | `str/cfg`| `"none"`, `"session"`, `"long_term"`, or a `MemoryConfig` object. |
 | `async_mode` | `bool` | **Performance Gate.** Enables parallel tool calls (Up to 60% faster). CRITICAL for scrapers/terminal use. |
-| `debug` | `bool` | **Reasoning Visibility.** Enables real-time **Industrial Logs** (`[TOOL]`, `[PLAN]`). |
-| `verbose` | `bool` | **Audit Summary.** Enables a **Trace Summary** post-execution (Detailed timing/tokens). |
 | `thinking`| `bool` | **Reasoning Mode.** Enables Chain-of-Thought (e.g. DeepSeek R1, Gemini Thinking). |
-| `show_thinking`|`bool`| **Thought Visibility.** If `False`, strips `<thought>` blocks from the output. (Default: `True`) |
+| `show_thinking`|`bool`| **Thought Visibility.** If `False`, strips `<thought>` blocks from the output. |
+| **Note** | | `debug` and `verbose` are now configured on the **Model Provider**. |
 
 ---
 
@@ -260,8 +259,8 @@ A multi-agent setup where one agent plans, one codes, and one audits, with the M
 ```python
 from orionagent import Agent, Manager, Gemini, chat
 
-# 1. High-Performance Model
-llm = Gemini("gemini-2.0-flash", temperature=0.1, token_count=True, debug=True)
+# 1. High-Performance Model (Configure logging here)
+llm = Gemini("gemini-2.5-flash", temperature=0.1, token_count=True, debug=True)
 
 # 2. Specialized Personnel
 researcher = Agent(name="Scraper", role="Researcher", use_default_tools=True)
@@ -273,7 +272,6 @@ manager = Manager(
     model=llm,
     agents=[researcher, coder, auditor],
     strategy="planning",                 # Enable Structured JSON Orchestration
-    verbose=True                         # Get a full token/time report at the end
 )
 
 # Efficiency Gate: Simple greetings skip planning automatically
@@ -335,12 +333,13 @@ agent.ask("Who approved the Q1 budget?") # Auto-retrieves from SQLite
 import os
 from orionagent import Agent, Manager, Gemini, chat, tool, MemoryConfig
 
-# 1. High-Performance Model Caching
+# 1. High-Performance Model Caching (Centralized Logging)
 llm = Gemini(
-    model_name="gemini-2.0-flash", 
+    model_name="gemini-2.5-flash", 
     temperature=0.1, 
     token_count=True, 
     debug=True,
+    verbose=True,
     thinking=True,      # Auto-switches to gemini-2.0-flash-thinking-exp
     show_thinking=False # Hide internal reasoning from the user
 )
@@ -365,7 +364,6 @@ manager = Manager(
     model=llm,
     agents=[auditor],
     strategy="planning",                 # Enable Structured JSON Orchestration
-    verbose=True
 )
 
 # 5. Launch
@@ -584,6 +582,7 @@ When you (the AI) are building an agent, choose the tier based on the user's vib
 1. **System Instruction Caching**: Keep the instructions static and deterministic. Avoid dynamic text inside the `system_instruction` to maximize provider-level prompt caching.
 2. **Memory Pruning**: Use `priority="low"` for conversational agents where deep historical context isn't required.
 3. **Deterministic Temperature**: Always set `temperature=0.0` for agents using complex tools (File, OS, Terminal) to prevent parameter hallucinations.
+4. **Centralized Logging**: Set `debug=True` and `verbose=True` on the **Model Provider** (`Gemini`, `OpenAI`, etc.) instead of the Agent or Manager for consistent observability.
 
 ---
 

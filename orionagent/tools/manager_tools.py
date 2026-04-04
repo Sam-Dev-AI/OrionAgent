@@ -11,13 +11,16 @@ class AgentRegistryTool(Tool):
         )
         self.manager = manager
 
-    def run(self, **kwargs) -> str:
+    def run(self, input_data: Any = None, **kwargs) -> str:
         if not self.manager.agents:
             return "No agents registered with the manager."
         
         roster = []
-        for agent in self.manager.agents:
-            roster.append(f"- {agent.name}: {agent.role}. {agent.description}")
+        for agent in self.manager._agents:
+            name = getattr(agent, 'name', 'Unknown')
+            role = getattr(agent, 'role', 'General Assistant')
+            desc = getattr(agent, 'description', 'No description provided.')
+            roster.append(f"- {name}: {role}. {desc}")
         return "\n".join(roster)
 
 class MemorySummarizerTool(Tool):
@@ -30,7 +33,7 @@ class MemorySummarizerTool(Tool):
         )
         self.manager = manager
 
-    def run(self, **kwargs) -> str:
+    def run(self, input_data: Any = None, **kwargs) -> str:
         from orionagent.memory.session import Session
         # Get active session
         sid = self.manager._session_manager.auto(self.manager.user_id, self.manager.name)
@@ -79,7 +82,13 @@ class TaskStatusTool(Tool):
         )
         self.manager = manager
 
-    def run(self, task_id: Optional[str] = None, **kwargs) -> str:
+    def run(self, input_data: Any = None, **kwargs) -> str:
+        task_id = None
+        if isinstance(input_data, dict):
+            task_id = input_data.get("task_id")
+        elif isinstance(input_data, str):
+            # rudimentary parsing if needed
+            pass
         # Placeholder for task tracking; currently Orion is stateless across asks
         # but the Manager can reason about the sequence of events.
         return "All systems operational. Listening for delegation results."

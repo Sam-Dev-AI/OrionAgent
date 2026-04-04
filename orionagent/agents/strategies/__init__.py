@@ -93,23 +93,23 @@ class _CombinedPlanLearnStrategy(BaseStrategy):
         self._planner = PlanningStrategy()
         self._learner = SelfLearnStrategy(max_refinements=max_refinements)
 
-    def execute(self, task, agents, model, system_instruction=None, context=None, temperature=None, tools=None, stream=True, async_mode=True, verbose=False, debug=False, record_trace=True, hitl=False, priority=None, manager_context=None, on_step_complete=None):
+    def execute(self, task, agents, model, system_instruction=None, context=None, temperature=None, tools=None, stream=True, async_mode=True, record_trace=True, hitl=False, priority=None, manager_context=None, on_step_complete=None):
         # Fast bypass for simple conversational tasks
         if not self.is_complex_task(task):
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
         if not model:
-            return self._planner.execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, verbose, debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+            return self._planner.execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
         # Step 1: Create a plan using the planning strategy
-        plan = self._planner._create_plan(task, agents, model, system_instruction, context, temperature, verbose=verbose, debug=debug)
+        plan = self._planner._create_plan(task, agents, model, system_instruction, context, temperature)
 
         if stream:
-            return self._stream_combined(plan, agents, model, task, system_instruction, verbose=verbose, debug=debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
-        return self._execute_combined(plan, agents, model, task, system_instruction, verbose=verbose, debug=debug, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+            return self._stream_combined(plan, agents, model, task, system_instruction, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+        return self._execute_combined(plan, agents, model, task, system_instruction, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
 
-    def _execute_combined(self, plan, agents, model, original_task, system_instruction=None, verbose=False, debug=False, record_trace=True, hitl=False, priority=None, manager_context=None, on_step_complete=None):
+    def _execute_combined(self, plan, agents, model, original_task, system_instruction=None, record_trace=True, hitl=False, priority=None, manager_context=None, on_step_complete=None):
         """Execute plan groups and return ONLY the final result."""
         import concurrent.futures
         last_result = ""
@@ -151,8 +151,6 @@ class _CombinedPlanLearnStrategy(BaseStrategy):
                             tools=None, 
                             stream=False, 
                             async_mode=True, 
-                            verbose=verbose, 
-                            debug=debug, 
                             record_trace=False,
                             priority=priority
                         ))
@@ -162,7 +160,7 @@ class _CombinedPlanLearnStrategy(BaseStrategy):
 
         return last_result
 
-    def _stream_combined(self, plan, agents, model, original_task, system_instruction=None, verbose=False, debug=False, record_trace=True, hitl=False, priority=None, manager_context=None, on_step_complete=None):
+    def _stream_combined(self, plan, agents, model, original_task, system_instruction=None, record_trace=True, hitl=False, priority=None, manager_context=None, on_step_complete=None):
         """Stream plan groups, yielding ONLY the final group's result."""
         import concurrent.futures
         last_result = ""
@@ -202,10 +200,7 @@ class _CombinedPlanLearnStrategy(BaseStrategy):
                             context=last_result, 
                             temperature=None, 
                             tools=None, 
-                            stream=False, 
                             async_mode=True, 
-                            verbose=verbose, 
-                            debug=debug, 
                             record_trace=False,
                             priority=priority
                         ))
