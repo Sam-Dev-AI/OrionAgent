@@ -25,7 +25,11 @@ class Tool:
     ):
         self.name = name
         self.description = description
-        self.parameters = parameters or {}
+        # Default to a valid empty object schema for LLM compatibility
+        self.parameters = parameters or {
+            "type": "object",
+            "properties": {}
+        }
         self.cacheable = cacheable
 
     def run(self, input_data) -> str:

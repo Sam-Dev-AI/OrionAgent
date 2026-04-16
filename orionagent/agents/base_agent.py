@@ -55,6 +55,7 @@ class Agent:
         max_refinements: int = 2,
         async_mode: bool = True,
         knowledge: Optional[Union[str, KnowledgeBase]] = None,
+        persistent_db: Optional[Any] = None,
     ):
         self.name = name
         self.role = role
@@ -90,7 +91,9 @@ class Agent:
             self._session_manager = SessionManager(base_dir=self.memory_config.storage_path)
             
             # Storage Selection (Hierarchical)
-            if self.memory_config.mode in ["persistent", "long_term", "chroma"]:
+            if persistent_db:
+                self._persistent_db = persistent_db
+            elif self.memory_config.mode in ["persistent", "long_term", "chroma"]:
                 db_file = os.path.join(self.memory_config.storage_path, "orionagent.db")
                 # chroma mode is the ultimate level (SQLite + Chroma)
                 use_vdb = (self.memory_config.mode == "chroma")
@@ -117,7 +120,9 @@ class Agent:
 
         # --- Knowledge / RAG setup ---
         if isinstance(knowledge, str):
-            self.knowledge = KnowledgeBase(collection_name=knowledge)
+            # Ensure KnowledgeBase uses the same root as memory config
+            kb_path = os.path.join(self.memory_config.storage_path, "knowledge")
+            self.knowledge = KnowledgeBase(persistence_path=kb_path, collection_name=knowledge)
         else:
             self.knowledge = knowledge
 
@@ -159,30 +164,50 @@ class Agent:
         stream: bool = True,
         use_strategy: bool = True,
         session_id: Optional[str] = None,
+        user_id: Optional[str] = None,
         record_memory: bool = True,
         record_trace: bool = True,
         priority: Optional[str] = None,
         temperature: Optional[float] = None,
     ) -> Union[str, Generator[str, None, None]]:
-        """Execute a task."""
+        """Execute a task.
+        
+        Args:
+            task: The prompt/task to execute.
+            stream: Whether to stream the response.
+            use_strategy: Whether to use the configured planning/self_learn strategy.
+            session_id: Optional override for the session ID.
+            user_id: Optional override for the user ID (scoping memory).
+            record_memory: Whether to save the turn to persistent storage.
+            record_trace: Whether to log to telemetry.
+            priority: Memory priority override (low, medium, high).
+            temperature: Model temperature override.
+        """
         from orionagent.tracing import tracer
         trace_id = None
         if record_trace:
             trace_id = tracer.start_trace("agent_ask", self.name, task, verbose=self.model.verbose, debug=self.model.debug)
 
+        # Multi-user scoping
+        target_user = user_id or self.user_id
+
         # Session loading
-        if self._active_session and (session_id is None or self._active_session.session_id == session_id):
+        if self._active_session and (session_id is None or self._active_session.session_id == session_id) and user_id is None:
             session = self._active_session
         elif self._session_manager:
-            sid = session_id or self._session_manager.auto(self.user_id, self.name)
-            session = self._session_manager.load(self.user_id, self.name, sid)
+            sid = session_id or self._session_manager.auto(target_user, self.name)
+            session = self._session_manager.load(target_user, self.name, sid)
             if not session:
-                session = Session(self.user_id, self.name, sid)
-            self._active_session = session
+                session = Session(target_user, self.name, sid)
+            
+            # Update cache only if we ARE using the agent's default user
+            if target_user == self.user_id:
+                self._active_session = session
         else:
             sid = session_id or "temp_session"
-            session = Session(self.user_id, self.name, sid)
-            self._active_session = session
+            session = Session(target_user, self.name, sid)
+            if target_user == self.user_id:
+                self._active_session = session
 
         # Update session priority if provided or use config default
         session.priority = priority or self.memory_config.priority

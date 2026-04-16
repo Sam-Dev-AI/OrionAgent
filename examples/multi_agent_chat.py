@@ -15,7 +15,7 @@ import os
 from orionagent import Agent, Manager, Gemini
 
 # 1. API KEY CONFIGURATION
-os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "Your_API_Key")
+os.environ["GEMINI_API_KEY"] = "YOUR_API_KEY"
 
 def run_demo_task(manager, task_name, task_prompt):
     """Helper to run a task programmatically without starting an interactive chat."""
@@ -31,8 +31,8 @@ def run_demo_task(manager, task_name, task_prompt):
     print("\n" + "-"*40)
 
 def main():
-    # 2. INITIALIZE CENTRAL BRAIN (Gemini 2.5 Flash)
-    llm = Gemini(model_name="gemini-2.5-flash", token_count=True, verbose=True, debug=True)
+    # 2. INITIALIZE CENTRAL BRAIN (Gemini 2.0 Flash)
+    llm = Gemini(model_name="gemini-2.0-flash", token_count=True, verbose=True, debug=True)
 
     # 3. DEFINE SPECIALIZED AGENTS
     researcher = Agent(
@@ -59,17 +59,15 @@ def main():
     )
 
 
-    # ------------------------------------------------------------------
-    # Handover to User
-    # ------------------------------------------------------------------
+    # 5. EXECUTE MULTI-STEP MISSION (Non-interactive)
+    task = "Research Gemini 2.0 and write a 2-paragraph summary in bullet points."
+    print(f"\n[TESTING] Task: {task}")
+    
+    result = manager.ask(task, user_id="multi_agent_user", stream=True)
+    print("Response: ", end="", flush=True)
+    for chunk in result:
+        print(chunk, end="", flush=True)
     print("\n" + "="*50)
-    print("ORIONAGENT: MULTI-AGENT SWARM ONLINE")
-    print("="*52)
-    print("MODE: Autonomous Planning + Multi-Agent Execution")
-    print("Status: Automated scenarios complete. Entering manual mode.\n")
-
-    # 5. START INTERACTIVE MISSION
-    manager.chat("Ready for human coordination. How can I help you today?")
 
 if __name__ == "__main__":
     main()

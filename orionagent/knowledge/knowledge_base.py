@@ -7,7 +7,7 @@ from orionagent.knowledge.loaders.markdown_loader import MarkdownLoader
 class KnowledgeBase:
     """Manages a dedicated knowledge collection in ChromaDB."""
     
-    def __init__(self, persistence_path: str = "memory/orion_data", collection_name: str = "orion_knowledge"):
+    def __init__(self, persistence_path: str = "agent_memory/knowledge", collection_name: str = "orion_knowledge"):
         import chromadb
         self.client = chromadb.PersistentClient(path=persistence_path)
         self.collection = self.client.get_or_create_collection(name=collection_name)

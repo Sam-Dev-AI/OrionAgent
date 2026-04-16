@@ -32,6 +32,7 @@ class DirectStrategy(BaseStrategy):
         priority: Optional[str] = None,
         manager_context: Optional[str] = None,
         on_step_complete: Optional[Any] = None,
+        user_id: Optional[str] = None,
     ) -> Union[str, Generator[str, None, None], Any]:
 
         if context:
@@ -84,7 +85,7 @@ class DirectStrategy(BaseStrategy):
         if stream:
             def _stream_and_record():
                 full_res = []
-                for chunk in self._stream_response(selected, prompt, model, record_trace=record_trace, priority=priority, temperature=temperature):
+                for chunk in self._stream_response(selected, prompt, model, record_trace=record_trace, priority=priority, temperature=temperature, user_id=user_id):
                     full_res.append(chunk)
                     yield chunk
                 # Record result into Manager's global memory
@@ -99,7 +100,8 @@ class DirectStrategy(BaseStrategy):
             record_memory=False, 
             record_trace=record_trace, 
             priority=priority, 
-            temperature=temperature
+            temperature=temperature,
+            user_id=user_id
         )
         # Record result into Manager's global memory
         if on_step_complete:
@@ -148,7 +150,7 @@ class DirectStrategy(BaseStrategy):
         )
 
     def _stream_response(
-        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True, priority: Optional[str] = None, temperature: float = None
+        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True, priority: Optional[str] = None, temperature: float = None, user_id: Optional[str] = None
     ) -> Generator[str, None, None]:
         yield from agent.ask(
             task=task, 
@@ -157,5 +159,6 @@ class DirectStrategy(BaseStrategy):
             record_memory=False, 
             record_trace=record_trace, 
             priority=priority, 
-            temperature=temperature
+            temperature=temperature,
+            user_id=user_id
         )

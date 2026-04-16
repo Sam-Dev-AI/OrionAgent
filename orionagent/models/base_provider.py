@@ -25,6 +25,11 @@ class ModelProvider:
         self.debug = debug
         self.thinking = thinking
         self.show_thinking = show_thinking
+        
+        # Sync global tracer
+        from orionagent.tracing import tracer
+        tracer.verbose = self.verbose
+        tracer.debug = self.debug
 
 
     def generate(

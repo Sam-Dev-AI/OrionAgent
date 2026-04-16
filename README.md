@@ -47,6 +47,12 @@ Install OrionAgent via pip for immediate industrial-grade orchestration:
 pip install orionagent
 ```
 
+To update to the latest version:
+
+```bash
+pip install --upgrade orionagent
+```
+
 ### Development Setup
 
 If you are cloning the repository to run examples or contribute, install in **editable mode** to ensure all local resources are correctly mapped:
@@ -55,6 +61,13 @@ If you are cloning the repository to run examples or contribute, install in **ed
 git clone https://github.com/Sam-Dev-AI/OrionAgent.git
 cd OrionAgent
 pip install -e .
+```
+
+To update the framework with the latest changes from the repository:
+
+```bash
+git pull
+pip install --upgrade .
 ```
 
 ---
@@ -226,7 +239,10 @@ agent.ask("What is the speed of light?", temperature=0.0)
 
 - **`token_count=True`**: Tracks input/output tokens for precise cost monitoring.
 - **`async_mode=True`**: Executes independent tasks in parallel (up to 60% faster).
-- **`debug=True`**: Enables live `[PLAN]`, `[TOOL]` tags in terminal (Set on the model provider).
+- **`debug=True`**: Enables live `[AGENT]`, `[MEMORY]`, and `[TOOL] : 1` tags in terminal. 
+
+> [!IMPORTANT]
+> **Production Observability**: Telemetry uses `flush=True` to ensure logs stream instantly in Flask/FastAPI terminal environments, providing real-time visibility into tool execution success/failure (1/0).
 
 ---
 
@@ -271,6 +287,16 @@ OrionAgent minimizes operational overhead by pruning unnecessary context and opt
 - **Priority-Driven Summarizer**: Use `low` priority for casual chats to save tokens with minimalist one-sentence summaries.
 - **Compact Planning Prompt**: The `Strategy` engine uses a specialized, ultra-lean prompt (~100 tokens) to decompose tasks, ensuring that the heavy lifting is done with minimal structural baggage.
 - **Precision Tool Routing**: Agents only receive the context relevant to the specific step they are executing, preventing "prompt pollution" from unrelated task phases.
+
+### Production Multi-User Orchestration
+OrionAgent is built for horizontal scale. Use the `user_id` parameter to maintain isolated memory for thousands of concurrent users on a single server instance.
+
+```python
+# Multi-user session isolation in Flask/FastAPI
+response = manager.ask(user_prompt, user_id=current_user_id)
+```
+- **Session Scoping**: Automatically routes all memory (SQLite/JSON) to `agent_memory/sessions/{user_id}/`.
+- **Stateless Safety**: Ensures zero "context leakage" between user requests.
 
 
 ### Knowledge Base Integration (RAG)
@@ -327,9 +353,9 @@ Managed through a **Hierarchical 3-Tier Synchronizer**, OrionAgent maintains sta
 
 | Tier | Owner | Storage | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Global Memory** | Manager | SQLite + JSON | Cross-agent knowledge hub. Records all agent delegation results. |
-| **Local Memory** | Each Agent | Session buffer (JSON) | Agent's own conversation history. Fully isolated per agent. |
-| **Shared Memory** | Optional | ChromaDB (Vector) | Semantic RAG via `KnowledgeBase`. Shared across agents if configured. |
+| **Global Memory** | Manager | SQLite + JSON | Cross-agent knowledge hub (in `agent_memory/`). |
+| **Local Memory** | Each Agent | Session buffer (JSON) | Isolated chat logs (in `agent_memory/sessions/`). |
+| **Shared Memory** | Optional | ChromaDB (Vector) | Semantic RAG (in `agent_memory/knowledge/`). |
 
 ### Data Synchronization Flow (The Memory Engine)
 ```mermaid

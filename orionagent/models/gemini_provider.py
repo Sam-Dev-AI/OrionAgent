@@ -105,9 +105,17 @@ class Gemini(ModelProvider):
         """Accumulate token counts silently. Use print_session_tokens() to display."""
         if not usage:
             return
-        self.session_input_tokens += (usage.prompt_token_count or 0)
-        self.session_output_tokens += (usage.candidates_token_count or 0)
-        self.session_total_tokens += (usage.total_token_count or 0)
+            
+        in_tokens = usage.prompt_token_count or 0
+        out_tokens = usage.candidates_token_count or 0
+        tot_tokens = usage.total_token_count or 0
+        
+        self.session_input_tokens += in_tokens
+        self.session_output_tokens += out_tokens
+        self.session_total_tokens += tot_tokens
+        
+        if self.token_count:
+            print(f"\033[35m[Tokens] In: {in_tokens} | Out: {out_tokens} | Total: {tot_tokens}\033[0m", flush=True)
 
     def generate(
         self,
@@ -158,7 +166,7 @@ class Gemini(ModelProvider):
                     name = part.function_call.name
                     args = part.function_call.args
                     if self.verbose:
-                        print(f"\033[94m[TOOL CALL: {name}({args})]\033[0m")
+                        print(f"\033[94m[TOOL CALL: {name}({args})]\033[0m", flush=True)
                     res = self._tool_executor.execute(name, args, tools)
                     tool_parts.append(
                         types.Part(function_response=types.FunctionResponse(name=name, response={"result": res}))
@@ -205,16 +213,17 @@ class Gemini(ModelProvider):
                     continue
 
                 content = chunk.candidates[0].content
-                for part in content.parts:
-                    if part.text:
-                        current_content_parts.append(part)
-                        yield part.text
-                    elif part.function_call:
-                        has_tool_call = True
-                        current_content_parts.append(part)
-                        # Print to logs only if verbose
-                        if self.verbose:
-                            print(f"\n\033[94m[TOOL CALL: {part.function_call.name}]\033[0m")
+                if content and content.parts:
+                    for part in content.parts:
+                        if part.text:
+                            current_content_parts.append(part)
+                            yield part.text
+                        elif part.function_call:
+                            has_tool_call = True
+                            current_content_parts.append(part)
+                            # Print to logs only if verbose
+                            if self.verbose:
+                                print(f"\n\033[94m[TOOL CALL: {part.function_call.name}]\033[0m", flush=True)
             
             # Apply usage only once per stream turn
             if last_usage:

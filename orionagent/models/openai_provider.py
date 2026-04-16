@@ -66,9 +66,17 @@ class OpenAI(ModelProvider):
         """Accumulate token counts silently. Use print_session_tokens() to display."""
         if not usage:
             return
-        self.session_input_tokens += (usage.prompt_tokens or 0)
-        self.session_output_tokens += (usage.completion_tokens or 0)
-        self.session_total_tokens += (usage.total_tokens or 0)
+            
+        in_tokens = usage.prompt_tokens or 0
+        out_tokens = usage.completion_tokens or 0
+        tot_tokens = usage.total_tokens or 0
+        
+        self.session_input_tokens += in_tokens
+        self.session_output_tokens += out_tokens
+        self.session_total_tokens += tot_tokens
+        
+        if self.token_count:
+            print(f"\033[35m[Tokens] In: {in_tokens} | Out: {out_tokens} | Total: {tot_tokens}\033[0m", flush=True)
 
     def _parse_rogue_tool_calls(self, content: str) -> List[dict]:
         """Intercept XML-style tool calls (e.g. from Nemotron) and format as standard tool calls."""

@@ -18,9 +18,9 @@ class BaseStrategy:
     """
 
     def _stream_response(
-        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None
+        self, agent: Agent, task: str, model: Any = None, record_trace: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, user_id: Optional[str] = None
     ) -> Generator[str, None, None]:
-        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace, priority=priority, temperature=temperature)
+        yield from agent.ask(task, stream=True, use_strategy=False, record_memory=False, record_trace=record_trace, priority=priority, temperature=temperature, user_id=user_id)
 
     def execute(
         self,
@@ -38,6 +38,7 @@ class BaseStrategy:
         priority: Optional[str] = None,
         manager_context: Optional[str] = None,
         on_step_complete: Optional[Any] = None,
+        user_id: Optional[str] = None,
     ) -> Union[str, Generator[str, None, None], "AgentHandoff"]:
         """Run the strategy on *task* using the given *agents*.
 

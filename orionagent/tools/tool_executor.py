@@ -95,51 +95,69 @@ class ToolExecutor:
                 name = call.get("name")
                 args = call.get("args")
                 target = tool_map.get(name)
+                
+                from orionagent.tracing import tracer
+                trace_id = tracer.start_trace("tool_call_raw", name, args)
+                
                 if target:
                     res = self._run_with_cache(target, args)
                     results.append({"name": name, "result": res})
                 else:
-                    results.append({"name": name, "result": f"Error: Tool '{name}' not found."})
+                    res = f"Error: Tool '{name}' not found."
+                    results.append({"name": name, "result": res})
+                
+                tracer.end_trace(trace_id, res)
             return results
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_to_call = {}
+            future_to_trace = {} # (future, trace_id, name)
 
             for call in tool_calls:
                 name = call.get("name")
                 args = call.get("args")
                 target = tool_map.get(name)
 
+                from orionagent.tracing import tracer
+                trace_id = tracer.start_trace("tool_call_raw", name, args)
+
                 if target:
                     future = executor.submit(self._run_with_cache, target, args)
-                    future_to_call[future] = name
+                    future_to_trace[future] = (trace_id, name)
                 else:
+                    res = f"Error: Tool '{name}' not found."
                     results.append({
                         "name": name,
-                        "result": f"Error: Tool '{name}' not found.",
+                        "result": res,
                     })
+                    tracer.end_trace(trace_id, res)
 
             done, not_done = concurrent.futures.wait(
-                future_to_call.keys(), timeout=self.timeout
+                future_to_trace.keys(), timeout=self.timeout
             )
-
+            
+            from orionagent.tracing import tracer
             for future in done:
-                name = future_to_call[future]
+                trace_id, name = future_to_trace.pop(future)
                 try:
                     res = future.result()
                     results.append({"name": name, "result": res})
+                    tracer.end_trace(trace_id, res)
                 except Exception as e:
+                    res = f"Error: Tool '{name}' failed: {e}"
                     results.append({
                         "name": name,
-                        "result": f"Error: Tool '{name}' failed: {e}",
+                        "result": res,
                     })
+                    tracer.end_trace(trace_id, res)
 
             for future in not_done:
-                name = future_to_call[future]
+                trace_id, name = future_to_trace.pop(future)
+                res = f"Error: Tool '{name}' timed out after {self.timeout}s."
                 results.append({
                     "name": name,
-                    "result": f"Error: Tool '{name}' timed out after {self.timeout}s.",
+                    "result": res,
                 })
+                tracer.end_trace(trace_id, res)
                 future.cancel()
 
         return results

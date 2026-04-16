@@ -65,6 +65,7 @@ class PlanningStrategy(BaseStrategy):
         priority: Optional[str] = None,
         manager_context: Optional[str] = None,
         on_step_complete: Optional[Any] = None,
+        user_id: Optional[str] = None,
 
     ) -> Union[str, Generator[str, None, None]]:
         from orionagent.tracing import tracer
@@ -72,7 +73,7 @@ class PlanningStrategy(BaseStrategy):
         if not model:
             # No model to plan with -- fall back to single delegation
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+            return DirectStrategy().execute(task, agents, model, system_instruction, context, temperature, tools, stream, async_mode, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete, user_id=user_id)
 
         # Efficiency Gate: Check if planning is actually needed
         if not self._requires_planning(task, agents, model, system_instruction, context, temperature):
@@ -82,7 +83,7 @@ class PlanningStrategy(BaseStrategy):
             relaxed_instruction = self._relax_instruction(system_instruction)
             
             from orionagent.agents.strategies.direct import DirectStrategy
-            return DirectStrategy().execute(task, agents, model, relaxed_instruction, context, temperature, tools, stream, async_mode, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete)
+            return DirectStrategy().execute(task, agents, model, relaxed_instruction, context, temperature, tools, stream, async_mode, record_trace=record_trace, hitl=hitl, priority=priority, manager_context=manager_context, on_step_complete=on_step_complete, user_id=user_id)
 
         from orionagent.tracing import tracer
         trace_id = tracer.start_trace("plan", "Creating task plan", task, verbose=model.verbose, debug=model.debug)
@@ -98,8 +99,8 @@ class PlanningStrategy(BaseStrategy):
 
 
         if stream:
-            return self._stream_plan(plan, agents, task, model, async_mode, priority=priority, temperature=temperature, tools=tools, manager_context=manager_context, on_step_complete=on_step_complete, verbose=model.verbose)
-        return self._execute_plan_full(plan, agents, task, model, async_mode, priority=priority, temperature=temperature, tools=tools, manager_context=manager_context, on_step_complete=on_step_complete, verbose=model.verbose)
+            return self._stream_plan(plan, agents, task, model, async_mode, priority=priority, temperature=temperature, tools=tools, manager_context=manager_context, on_step_complete=on_step_complete, verbose=model.verbose, user_id=user_id)
+        return self._execute_plan_full(plan, agents, task, model, async_mode, priority=priority, temperature=temperature, tools=tools, manager_context=manager_context, on_step_complete=on_step_complete, verbose=model.verbose, user_id=user_id)
 
     # ------------------------------------------------------------------
     # Plan creation
@@ -228,7 +229,7 @@ class PlanningStrategy(BaseStrategy):
         return agents[0]
 
     def _execute_plan_full(
-        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, tools: Optional[List[Any]] = None, manager_context: Optional[str] = None, on_step_complete: Optional[Any] = None, verbose: bool = False
+        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, tools: Optional[List[Any]] = None, manager_context: Optional[str] = None, on_step_complete: Optional[Any] = None, verbose: bool = False, user_id: Optional[str] = None
     ) -> str:
         """Execute all plan steps and return a synthesized final result."""
         results = []
@@ -263,17 +264,23 @@ class PlanningStrategy(BaseStrategy):
                     record_memory=False,
                     record_trace=True,
                     priority=priority,
-                    temperature=temperature
+                    temperature=temperature,
+                    user_id=user_id
                 )
             # Case 2: Target is a Manager Tool
             else:
+                from orionagent.tracing import tracer
                 # Tools might expect specific args, but for simple planning we pass prompt as 'task' if it accepts it
+                trace_id = tracer.start_trace("tool_call_raw", target_name, {"task": prompt})
+                
                 import inspect
                 sig = inspect.signature(target.run)
                 if 'task' in sig.parameters or any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values()):
                     last_result = target.run(input_data={'task': prompt})
                 else:
                     last_result = target.run(input_data={})
+                
+                tracer.end_trace(trace_id, last_result)
             # Record step result into Manager's global memory
             if on_step_complete:
                 on_step_complete(target_name, instruction, last_result)
@@ -284,7 +291,7 @@ class PlanningStrategy(BaseStrategy):
         return self._synthesize_results(original_task, results, model, verbose=verbose)
 
     def _stream_plan(
-        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, tools: Optional[List[Any]] = None, manager_context: Optional[str] = None, on_step_complete: Optional[Any] = None, verbose: bool = False
+        self, plan: list, agents: List[Agent], original_task: str, model: Any = None, async_mode: bool = True, priority: Optional[str] = None, temperature: Optional[float] = None, tools: Optional[List[Any]] = None, manager_context: Optional[str] = None, on_step_complete: Optional[Any] = None, verbose: bool = False, user_id: Optional[str] = None
     ) -> Generator[str, None, None]:
         """Stream plan execution, yielding debug info and the final synthesized result."""
         results = []
@@ -320,7 +327,8 @@ class PlanningStrategy(BaseStrategy):
                     record_memory=False, 
                     record_trace=True, 
                     priority=priority, 
-                    temperature=temperature
+                    temperature=temperature,
+                    user_id=user_id
                 ):
                     step_res += chunk
                     if verbose:

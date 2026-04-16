@@ -159,7 +159,8 @@ tests/hard_tests/
 test/
 *.db
 *.json
-pyproject.toml
+# pyproject.toml # Remove this to ensure package metadata is tracked
+agent_memory/
 test_minimal.py
 tests/
 !README.md

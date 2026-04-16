@@ -63,7 +63,25 @@ When defining an `Agent`, every parameter is tunable for specific engineering ne
 | `async_mode` | `bool` | **Performance Gate.** Enables parallel tool calls (Up to 60% faster). CRITICAL for scrapers/terminal use. |
 | `thinking`| `bool` | **Reasoning Mode.** Enables Chain-of-Thought (e.g. DeepSeek R1, Gemini Thinking). |
 | `show_thinking`|`bool`| **Thought Visibility.** If `False`, strips `<thought>` blocks from the output. |
-| **Note** | | `debug` and `verbose` are now configured on the **Model Provider**. |
+
+### 🔍 Real-time Logging (Flask/Terminal)
+To enable real-time observability in the terminal (natively working with Flask/FastAPI), use these **Model Provider** flags:
+
+| Flag | Effect |
+| :--- | :--- |
+| **`token_count=True`** | Logs Input/Output tokens for every call immediately. |
+| **`verbose=True`** | Logs sequence of events (Agent ask, Tool call, etc.). |
+| **`debug=True`** | Logs deep internals and raw payloads. |
+| **Tool Status (1/0)** | Shows binary status: `1` (Success) or `0` (Failure) in 1 line. |
+
+*Note*: These logs use `flush=True` and standardized ASCII symbols (`+-`) to ensure they stream instantly in active server environments (Flask/FastAPI) across all OS platforms (Windows/Linux). In a Flask/FastAPI terminal, you will see a clean stream of execution for every concurrent request:
+```text
+[AGENT] Vanguard-Industrial
+[MEMORY] Storing user turn
+[TOOL] scrape_website : 1
+[TOOL] save_to_db : 1
+```
+
 
 ---
 
@@ -91,7 +109,38 @@ Understanding how to trigger an agent is key to preventing redundant loops or lo
 - **The Orchestration Loop**: Unlike a single agent, the `Manager`'s `.chat()` triggers the **Strategy Engine**. 
 - If `strategy="planning"` is set, every message you send triggers the **Strategic Orchestration Loop**:
     1. **Efficiency Gate**: Manager checks if the task is simple (Skip Plan) or complex (Full Plan).
-    2. **Orchestration**: If complex, it generates a multi-step JSON roadmap for agents.
+### D. The Multi-User Protocol (`user_id`)
+OrionAgent is designed for production environments. To prevent "context leakage" between different people:
+
+- **Pass `user_id` to `.ask()`**:
+  ```python
+  # isolated session for user_123
+  manager.ask("Hello", user_id="user_123") 
+  ```
+- **Automatic Scoping**: The framework automatically creates `agent_memory/sessions/{user_id}/` to store history.
+- **Stateless Instances**: A single singleton `Manager` or `Agent` instance can handle thousands of concurrent users safely.
+
+### E. Flask / FastAPI Integration
+When building a web backend, pass the persistent User ID (JWT subject or Session ID) directly to the framework:
+
+```python
+from flask import Flask, request, jsonify
+from orionagent import Manager, Gemini
+
+app = Flask(__name__)
+llm = Gemini(debug=True) # Enable terminal telemetry
+manager = Manager(model=llm, agents=[...])
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.json
+    uid = data.get("user_id") # e.g. "user_789"
+    task = data.get("message")
+    
+    # The terminal will now stream logs for this user specifically
+    response = manager.ask(task, user_id=uid)
+    return jsonify({"response": response})
+```
 
 ---
 

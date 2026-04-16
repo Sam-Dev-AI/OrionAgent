@@ -7,7 +7,7 @@ from datetime import datetime
 from orionagent import Agent, Gemini, tool
 
 # 1. API KEY CONFIGURATION
-os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "Your_API_Key")
+os.environ["GEMINI_API_KEY"] = "YOUR_API_KEY"
 
 # 2. DEFINE INDUSTRIAL CUSTOM TOOLS
 @tool
@@ -89,19 +89,18 @@ def save_leads_to_csv(leads_json: str, filename: str = "leads_export.csv"):
         return f"Error saving leads: {str(e)}"
 
 def main():
-    # 3. INITIALIZE THE CORE ENGINE (Using Gemini 2.5 Flash)
-    llm = Gemini(model_name="gemini-2.5-flash", token_count=True, debug=True)
+    # 3. INITIALIZE THE CORE ENGINE (Using Gemini 2.0 Flash)
+    llm = Gemini(model_name="gemini-2.0-flash", token_count=True, debug=True)
 
     # 4. DEFINE THE 'VANGUARD' AGENT
     agent = Agent(
         name="Vanguard-Industrial",
         role="Lead Generation & Business Intelligence Specialist",
         system_instruction=(
-            "You are an industrial-grade intelligence agent. Your mission is to find, "
-            "analyze, and organize business leads with surgical precision.\n"
-            "1. Use 'scrape_website' to gather REAL intelligence from target URLs.\n"
-            "2. Extract the business name, contacts, and niche from the scraped body.\n"
-            "3. Use 'save_leads_to_csv' to persist findings for the client.\n"
+            "You are an industrial-grade intelligence agent. MISSION: Find and organize data.\n"
+            "1. ALWAYS use 'scrape_website' immediately when a URL is provided.\n"
+            "2. Extract the business name, contacts, and title from the result.\n"
+            "3. DO NOT ASK for permission. Just execute the tool and report the result.\n"
             "Be extremely tool-reliant and data-driven."
         ),
         model=llm,
@@ -113,14 +112,16 @@ def main():
     print("\n" + "="*60)
     print("ORIONAGENT: REAL-WORLD SCRAPING & LEAD MANAGEMENT")
     print("="*60)
-    print("COMMANDS: Type 'exit' to quit.\n")
 
-    # 5. START INTERACTIVE CHAT
-    welcome_msg = (
-        "System Online. Vanguard-Industrial ready. "
-        "Try: 'Scrape https://www.google.com and save the info to my leads file.'"
-    )
-    agent.chat(welcome_msg)
+    # 5. EXECUTE TEST TASK (Non-interactive)
+    task = "Scrape https://www.google.com and let me know the title."
+    print(f"\n[TESTING] Task: {task}")
+    
+    response_gen = agent.ask(task, user_id="example_user")
+    print("Agent Response: ", end="", flush=True)
+    for chunk in response_gen:
+        print(chunk, end="", flush=True)
+    print()
 
 if __name__ == "__main__":
     main()

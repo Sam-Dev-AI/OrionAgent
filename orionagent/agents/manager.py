@@ -161,7 +161,8 @@ class Manager:
         from orionagent.tools.rag_tools import IngestTool, QueryKnowledgeTool
         
         if isinstance(knowledge, str):
-            self.knowledge = KnowledgeBase(collection_name=knowledge)
+            kb_path = os.path.join(self.memory_config.storage_path, "knowledge")
+            self.knowledge = KnowledgeBase(persistence_path=kb_path, collection_name=knowledge)
         else:
             self.knowledge = knowledge
 
@@ -222,11 +223,26 @@ class Manager:
         record_memory: bool = True,
         record_trace: bool = True,
         temperature: Optional[float] = None,
+        user_id: Optional[str] = None,
         allowed_agents: Optional[List[str]] = None,
         blocked_agents: Optional[List[str]] = None,
         force_agent: Optional[str] = None,
     ) -> Union[str, Generator[str, None, None]]:
-        """Orchestrate a task across multiple agents."""
+        """Orchestrate a task across multiple agents.
+        
+        Args:
+            task: The user's task or question.
+            stream: Whether to stream the response.
+            session_id: Optional override for the Manager's session ID.
+            user_id: Optional override for the user ID (multi-user isolation).
+            priority: Memory priority override.
+            record_memory: Whether to save to persistent storage.
+            record_trace: Whether to log to telemetry.
+            temperature: Orchestrator temperature.
+            allowed_agents: List of agent names allowed for this task.
+            blocked_agents: List of agent names to ignore for this task.
+            force_agent: Force a specific agent to handle the task.
+        """
         from orionagent.tracing import tracer
         from orionagent.agents.handoff import AgentHandoff
         
@@ -274,11 +290,12 @@ class Manager:
 
         context = None
         manager_context = None
-        sid = session_id or self._session_manager.auto(self.user_id, "Manager")
-        session = self._session_manager.load(self.user_id, "Manager", sid)
+        target_user = user_id or self.user_id
+        sid = session_id or self._session_manager.auto(target_user, "Manager")
+        session = self._session_manager.load(target_user, "Manager", sid)
         if not session:
             from orionagent.memory.session import Session
-            session = Session(self.user_id, "Manager", sid)
+            session = Session(target_user, "Manager", sid)
         
         if priority:
             session.priority = priority
@@ -332,6 +349,7 @@ class Manager:
             priority=priority,
             manager_context=manager_context,
             on_step_complete=_on_step_complete,
+            user_id=user_id
         )
 
         
@@ -340,7 +358,7 @@ class Manager:
             tracer.log_event("handoff_detected", result.target_agent, result.task, metadata={"source": result.source_agent})
             target = next((a for a in execution_agents if a.name == result.target_agent), None)
             if target:
-                final_res = target.ask(result.to_prompt(), stream=stream, record_trace=False)
+                final_res = target.ask(result.to_prompt(), stream=stream, record_trace=False, user_id=user_id)
                 if trace_id:
                     tracer.end_trace(trace_id, "[Handoff Executed]")
                 return final_res

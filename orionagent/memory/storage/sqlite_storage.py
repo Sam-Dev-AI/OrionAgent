@@ -17,7 +17,7 @@ class SQLiteStorage:
     If chromadb is installed, uses it for semantic retrieval.
     Otherwise falls back to SequenceMatcher similarity.
     """
-    def __init__(self, db_path: str = "memory/orionagent.db", use_chroma: bool = True):
+    def __init__(self, db_path: str = "agent_memory/orionagent.db", use_chroma: bool = True):
         self.db_path = db_path
         base_dir = os.path.dirname(os.path.abspath(self.db_path))
         os.makedirs(base_dir, exist_ok=True)

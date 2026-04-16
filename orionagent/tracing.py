@@ -77,7 +77,7 @@ class TraceManager:
             DIM = "\033[90m"
             RESET = "\033[0m"
             tag = f"[{event_type.upper()}]"
-            print(f"{DIM}{tag:12} {name}{RESET}")
+            print(f"{DIM}{tag:12} {name}{RESET}", flush=True)
             
         return event
 
@@ -102,7 +102,7 @@ class TraceManager:
             DIM = "\033[90m"
             RESET = "\033[0m"
             tag = f"[{event_type.upper()}]"
-            print(f"{DIM}{tag:12} {name}{RESET}")
+            print(f"{DIM}{tag:12} {name}{RESET}", flush=True)
             
         return trace_id
 
@@ -113,6 +113,19 @@ class TraceManager:
             return None
 
         duration = time.time() - data["start"]
+        
+        # Determine status for tool calls
+        status = None
+        if data["type"] == "tool_call_raw":
+            if isinstance(output_data, str) and output_data.startswith("Error:"):
+                status = 0
+            else:
+                status = 1
+        
+        # Real-time debug logging for completion
+        if self.debug:
+            self._print_debug_tag(data["type"], data["name"], status=status, is_end=True)
+
         return self.log_event(
             event_type=data["type"],
             name=data["name"],
@@ -122,12 +135,13 @@ class TraceManager:
             metadata=data["metadata"]
         )
 
-    def _print_debug_tag(self, event_type: str, name: str):
+    def _print_debug_tag(self, event_type: str, name: str, status: Optional[int] = None, is_end: bool = False):
         """Print clean user-facing debug tags."""
         # Map internal types to user tags
         mapping = {
             "plan": "PLAN",
             "tool": "TOOL",
+            "tool_call_raw": "TOOL",
             "guard": "GUARD",
             "memory": "MEMORY",
             "agent_ask": "AGENT",
@@ -136,7 +150,19 @@ class TraceManager:
         tag_label = mapping.get(event_type, event_type.upper())
         
         # Use simple bold text for debug mode
-        print(f"\033[1m[{tag_label}]\033[0m {name}")
+        if is_end:
+            if status is not None:
+                color = "\033[92m" if status == 1 else "\033[91m" # Green if 1, Red if 0
+                # Merged single line print for tools
+                print(f"\033[1m[{tag_label}]\033[0m {name} : {color}{status}\033[0m", flush=True)
+            else:
+                # For non-status events, just show completion if it's significant
+                pass
+        else:
+            # Skip initial print for tools, we will print everything in one line at the end
+            if tag_label == "TOOL":
+                return
+            print(f"\033[1m[{tag_label}]\033[0m {name}", flush=True)
 
     def print_summary(self):
         """Print a human-readable summary of new events since the last print."""

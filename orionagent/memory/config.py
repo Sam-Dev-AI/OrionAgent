@@ -32,7 +32,7 @@ class MemoryConfig:
     
     importance_threshold: int = 7
     vector_top_k: int = 5
-    storage_path: str = "memory"
+    storage_path: str = "agent_memory"
     extract_entities: bool = True
     priority: str = "medium"
     entity_categories: list = field(default_factory=lambda: ["Personal", "Preference", "Decision", "Professional"])
@@ -43,8 +43,11 @@ class MemoryConfig:
             self.mode = "persistent"
         
         # Ensure chroma storage uses a subfolder
-        if self.mode == "chroma" and self.storage_path == "memory":
-            self.storage_path = "memory/chroma_db"
+        if self.mode == "chroma":
+            # If storage_path is specifically set to the default, we help organize it
+            # Otherwise we assume the user knows where they want their chroma_db
+            if self.storage_path == "agent_memory":
+                self.storage_path = os.path.join(self.storage_path, "chroma_db")
 
     @classmethod
     def from_dict(cls, data: dict) -> "MemoryConfig":
@@ -56,9 +59,8 @@ class MemoryConfig:
             summary_tokens=data.get("summary_tokens", 120),
             importance_threshold=data.get("importance_threshold", 7),
             vector_top_k=data.get("vector_top_k", 5),
-            storage_path=data.get("storage_path", "memory"),
+            storage_path=data.get("storage_path", "agent_memory"),
             extract_entities=data.get("extract_entities", True),
             priority=data.get("priority", "medium"),
             entity_categories=data.get("entity_categories", ["Personal", "Preference", "Decision", "Professional"])
         )
-
